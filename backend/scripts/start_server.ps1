@@ -9,7 +9,8 @@ Write-Host "╚═════════════════════�
 Write-Host ""
 
 # Backend dizinine git
-Set-Location $PSScriptRoot
+$BackendDir = Split-Path -Parent $PSScriptRoot
+Set-Location $BackendDir
 
 # Docker servislerini kontrol et
 Write-Host "→ Docker servisleri kontrol ediliyor..." -ForegroundColor Yellow
