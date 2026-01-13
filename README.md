@@ -97,23 +97,31 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 
 ## 📚 Proje Dokümantasyonu
 
-### 📋 Yönetim Dosyaları
-- **[context.md](./context.md)** - Güncel proje durumu ve yapılacaklar listesi
-- **[team-roles.md](./team-roles.md)** - Ekip görev dağılımı (Kaan, Barış, Önder)
-- **[INTEGRATION.md](./INTEGRATION.md)** - Mock→Real API entegrasyon rehberi
-- **[API-CONTRACT.md](./API-CONTRACT.md)** - API sözleşmesi ve endpoint tanımları
+**Tüm dökümanlar [`docs/`](./docs/) klasöründe organize edilmiştir.**
 
-### 🎯 Hızlı Başlangıç
-1. **Proje durumunu öğren:** [context.md](./context.md)
-2. **Görevini bul:** [team-roles.md](./team-roles.md)
-3. **API'leri öğren:** [API-CONTRACT.md](./API-CONTRACT.md)
-4. **Entegrasyon yap:** [INTEGRATION.md](./INTEGRATION.md)
+### 🚀 Hızlı Başlangıç
+- **[Hızlı Başlangıç Rehberi](./docs/01-QUICK-START.md)** - İlk kurulum ve adım adım rehber
+- **[Environment Setup](./docs/02-ENVIRONMENT-SETUP.md)** - API key'leri ve yapılandırma
+- **[Proje Durumu](./docs/06-PROJECT-STATUS.md)** - Güncel durum ve yapılacaklar
+
+### 👥 Ekip ve Görevler
+- **[Ekip Görev Dağılımı](./docs/03-TEAM-ROLES.md)** - Kaan, Barış, Önder görevleri
+- **[Proje Genel Bakış](./docs/00-PROJECT-OVERVIEW.md)** - Detaylı proje tanıtımı
+
+### 🔧 Teknik Dökümanlar
+- **[API Contract](./docs/04-API-CONTRACT.md)** - Tüm API endpoint'leri ve örnekler
+- **[Integration Guide](./docs/05-INTEGRATION-GUIDE.md)** - Mock→Real API entegrasyonu
+
+### 📊 Raporlar
+- **[Görev Raporları](./docs/reports/)** - Tamamlanan görevlerin detaylı raporları
+
+**Detaylı döküman indeksi için:** [`docs/README.md`](./docs/README.md)
 
 ## 🗺️ Geliştirme Yol Haritası
 
 ### ✅ Faz 1: Altyapı (Hafta 1-4)
-- [ ] Docker environment setup
-- [ ] PostgreSQL + pgvector kurulumu
+- [x] Docker environment setup ✅ (13 Ocak 2026)
+- [x] PostgreSQL + pgvector kurulumu ✅ (13 Ocak 2026)
 - [ ] FastAPI temel yapı
 - [ ] Next.js frontend skeleton
 - [ ] JWT authentication
@@ -129,8 +137,6 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 - [ ] Ödeme entegrasyonu (İyzico/Stripe)
 - [ ] Responsive UI
 - [ ] Optimizasyonlar (Redis, Celery)
-
-**Detaylı roadmap için:** [bibliomin_plan.md](./bibliomin_plan.md)
 
 ## 🎨 Ekran Görüntüleri
 
