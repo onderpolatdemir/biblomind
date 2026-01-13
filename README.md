@@ -95,6 +95,20 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
+## 📚 Proje Dokümantasyonu
+
+### 📋 Yönetim Dosyaları
+- **[context.md](./context.md)** - Güncel proje durumu ve yapılacaklar listesi
+- **[team-roles.md](./team-roles.md)** - Ekip görev dağılımı (Kaan, Barış, Önder)
+- **[INTEGRATION.md](./INTEGRATION.md)** - Mock→Real API entegrasyon rehberi
+- **[API-CONTRACT.md](./API-CONTRACT.md)** - API sözleşmesi ve endpoint tanımları
+
+### 🎯 Hızlı Başlangıç
+1. **Proje durumunu öğren:** [context.md](./context.md)
+2. **Görevini bul:** [team-roles.md](./team-roles.md)
+3. **API'leri öğren:** [API-CONTRACT.md](./API-CONTRACT.md)
+4. **Entegrasyon yap:** [INTEGRATION.md](./INTEGRATION.md)
+
 ## 🗺️ Geliştirme Yol Haritası
 
 ### ✅ Faz 1: Altyapı (Hafta 1-4)
@@ -115,6 +129,8 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 - [ ] Ödeme entegrasyonu (İyzico/Stripe)
 - [ ] Responsive UI
 - [ ] Optimizasyonlar (Redis, Celery)
+
+**Detaylı roadmap için:** [bibliomin_plan.md](./bibliomin_plan.md)
 
 ## 🎨 Ekran Görüntüleri
 
