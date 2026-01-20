@@ -1,6 +1,7 @@
 """Authentication API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -47,17 +48,20 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     """
-    Login with email and password.
+    OAuth2 compatible login endpoint - Swagger UI'da email/password popup gösterir.
     
-    - **email**: User's email address
+    - **username**: Email address (OAuth2 standardında 'username' field'ı kullanılır)
     - **password**: User's password
     
     Returns access and refresh tokens upon successful authentication.
     """
-    # Authenticate user
-    user = AuthService.authenticate_user(db, credentials.email, credentials.password)
+    # Authenticate user (form_data.username aslında email'dir)
+    user = AuthService.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

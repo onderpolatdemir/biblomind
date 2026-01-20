@@ -23,7 +23,7 @@ BiblioMind, fiziksel kitaplıkları dijital keşif alanına dönüştüren AI pl
 ## 📊 Genel İlerleme
 
 - [x] **Planlama:** Proje analizi ve görev dağılımı ✅ (13 Ocak)
-- [~] **Faz 1:** Altyapı (Hafta 1-4) - **%33** 🚀 (4/12 görev tamamlandı)
+- [~] **Faz 1:** Altyapı (Hafta 1-4) - **%42** 🚀 (5/12 görev tamamlandı)
 - [ ] **Faz 2:** AI Entegrasyonu (Hafta 5-8) - %0
 - [ ] **Faz 3:** E-ticaret & Polish (Hafta 9-12) - %0
 
@@ -117,29 +117,73 @@ BiblioMind, fiziksel kitaplıkları dijital keşif alanına dönüştüren AI pl
 - [x] Rapor: `docs/reports/TASK-04-AUTHENTICATION.md`
 - [x] **Barış için BLOCKER kaldırıldı!** Frontend auth UI hazır olabilir 🎉
 
+#### ✅ Görev 5: Books API (CRUD) (20 Ocak 2026) 📚
+- [x] Admin permission sistemi:
+  - [x] `User.is_admin` field eklendi
+  - [x] Alembic migration (`b3a2c94e5f12`)
+  - [x] `get_current_admin_user` dependency
+  - [x] 403 Forbidden for non-admin
+- [x] Pydantic schemas (`app/schemas/book.py`):
+  - [x] `BookBase` - Ortak fieldlar
+  - [x] `BookCreate` - Admin için oluşturma
+  - [x] `BookUpdate` - Admin için güncelleme (partial)
+  - [x] `BookResponse` - Public response
+  - [x] `BookListResponse` - Pagination wrapper
+- [x] Book service (`app/services/book_service.py`):
+  - [x] `get_books()` - Pagination, filtering, sorting
+  - [x] `get_book_by_id()` - Single book
+  - [x] `create_book()` - Admin only
+  - [x] `update_book()` - Admin only
+  - [x] `delete_book()` - Admin only
+  - [x] `check_isbn_exists()` - ISBN uniqueness
+- [x] Books API endpoints (`app/api/books.py`):
+  - [x] `GET /api/books` - Public list (pagination + filters)
+  - [x] `GET /api/books/{id}` - Public detail
+  - [x] `POST /api/books` - Admin create
+  - [x] `PUT /api/books/{id}` - Admin update
+  - [x] `DELETE /api/books/{id}` - Admin delete
+- [x] Features:
+  - [x] Pagination (page, page_size, total_pages)
+  - [x] Filters (genre, author, price range)
+  - [x] Sorting (title, author, price, created_at)
+  - [x] ISBN uniqueness validation
+- [x] Seed data (`scripts/seed_books.py`):
+  - [x] 20 klasik ve popüler kitap
+  - [x] Duplicate check
+  - [x] Bulk insert
+- [x] Rapor: `docs/reports/TASK-05-BOOKS-API.md`
+- [x] **Branch:** `kaan/feature/books-api`
+
 ---
 
 ## 🔄 Devam Eden Görevler
 
 ### Sprint 1: Hafta 1-2 (13-26 Ocak 2026)
 
-#### 🔴 KAAN - Altyapı Kurulumu (**%100 TAMAMLANDI!** 🎉)
-- [x] Docker Compose setup (PostgreSQL, Redis, Elasticsearch) ✅ 13 Ocak 2026
-- [x] Database schema & migration (Alembic) ✅ 13 Ocak 2026
-- [x] FastAPI core setup ✅ 13 Ocak 2026
-- [x] JWT authentication API ✅ 13 Ocak 2026
+#### 🔴 KAAN - Altyapı Kurulumu (**İlk 5 Görev Tamamlandı!** 🎉)
+- [x] Görev 1: Docker Compose setup (PostgreSQL, Redis, Elasticsearch) ✅ 13 Ocak 2026
+- [x] Görev 2: Database schema & migration (Alembic) ✅ 13 Ocak 2026
+- [x] Görev 3: FastAPI core setup ✅ 13 Ocak 2026
+- [x] Görev 4: JWT authentication API ✅ 13 Ocak 2026
+- [x] Görev 5: Books API (CRUD) ✅ 20 Ocak 2026
+- [ ] Görev 6: Elasticsearch Search (sırada)
+- [ ] Görev 7: User Preferences System
+- [ ] Görev 8: Admin Panel Backend
 
-**Çıktı:** ✅ **Auth API hazır ve çalışıyor!** → Barış entegre edebilir 🚀
+**Çıktı:** ✅ **Books API hazır!** → Barış ve Önder kullanabilir 🚀
 
 **Son Durum:** 
 - Docker servisleri çalışıyor (PostgreSQL:5433, Redis:6379, ES:9200)
-- 8 database modeli + migration uygulandı
+- 9 database modeli + 2 migration uygulandı (is_admin eklendi)
 - FastAPI core hazır (CORS, logging, health check)
 - Auth API tam fonksiyonel (register, login, me, refresh)
+- **Books API tam fonksiyonel (5 endpoint, pagination, filters)**
+- **Admin permission sistemi aktif**
+- **20 kitap seed data hazır**
 - Swagger UI: http://localhost:8000/docs
 - Server script: `./scripts/start_server.sh` veya `.ps1`
 
-**Sıradaki:** Görev 5 - Books API (CRUD)
+**Sıradaki:** Görev 6 - Elasticsearch Search Integration
 
 #### 🔵 BARIŞ - Frontend Foundation
 - [ ] Next.js + Tailwind setup
@@ -164,17 +208,19 @@ BiblioMind, fiziksel kitaplıkları dijital keşif alanına dönüştüren AI pl
 1. ~~**Kaan:** Docker ortamını ayağa kaldır (PostgreSQL + pgvector)~~ ✅
 2. ~~**Kaan:** Database migration'ları çalıştır~~ ✅
 3. ~~**Kaan:** Auth API'yi tamamla ve test et~~ ✅
+4. ~~**Kaan:** Books API (CRUD endpoints)~~ ✅
 
 ### 🚀 Sıradaki Görevler (Kaan)
-4. **Görev 5:** Books API (CRUD endpoints) 📚
-5. **Görev 6:** Elasticsearch entegrasyonu (search)
-6. **Görev 7:** User preferences system
+5. **Görev 6:** Elasticsearch Search Integration 🔍
+6. **Görev 7:** User Preferences System 👤
+7. **Görev 8:** Admin Panel Backend 🔧
 
 ### Paralel İşler (Diğer Ekip Üyeleri)
 - **Barış:** Next.js projesini başlat + Design system kur
 - **Barış:** Mock API service'leri oluştur (`lib/api/mock/`)
 - **Barış:** Auth UI - gerçek API'ye entegre et (blocker kaldırıldı!)
-- **Önder:** Cart/Order API endpoints'leri implement et (modeller hazır!)
+- **Barış:** Books list/detail pages (blocker kaldırıldı!) 📚
+- **Önder:** Cart/Order API endpoints'leri implement et (modeller + Books API hazır!)
 
 ---
 
@@ -318,12 +364,13 @@ BiblioMind, fiziksel kitaplıkları dijital keşif alanına dönüştüren AI pl
 ### Milestone 1: MVP Backend (Hafta 4)
 **Tarih:** 9 Şubat 2026  
 **Hedef:** Auth + CRUD + Search çalışıyor  
-**İlerleme:** **%50** 🚀
+**İlerleme:** **%67** 🚀
 
 **Kabul Kriterleri:**
 - [x] Docker ortamı ayağa kalkıyor ✅
 - [x] Kullanıcı kayıt/giriş yapabiliyor ✅
-- [ ] Kitap listeleme ve arama çalışıyor (sırada)
+- [x] Kitap listeleme çalışıyor ✅
+- [ ] Kitap arama (Elasticsearch) (sırada)
 - [x] API documentation güncel (Swagger) ✅
 
 ---
@@ -424,14 +471,24 @@ Her sprint'in **Çarşamba günü** entegrasyon günüdür:
 
 ---
 
-**Son Güncelleme:** 13 Ocak 2026 - 22:00  
-**Sprint:** Sprint 1 (13-26 Ocak) - Phase 1 başlangıcı  
-**İlerleme:** 4/12 temel görev tamamlandı (%33) 🎉  
+**Son Güncelleme:** 20 Ocak 2026 - 14:00  
+**Sprint:** Sprint 1 (13-26 Ocak) - Phase 1 devam ediyor  
+**İlerleme:** 5/12 temel görev tamamlandı (%42) 🎉  
 **Güncelleyen:** AI Assistant
 
 ---
 
-## 🎉 BUGÜNKÜ KAZANIMLAR (13 Ocak 2026)
+## 🎉 KAZANIMLAR
+
+### 20 Ocak 2026 (Bugün)
+**Görev 5: Books API** ✅
+- Books CRUD API (5 endpoint)
+- Admin permission sistemi
+- Pagination + filtering + sorting
+- 20 kitap seed data
+- Rapor: `docs/reports/TASK-05-BOOKS-API.md`
+
+### 13 Ocak 2026
 
 ### Tamamlanan Görevler (Tek Günde!)
 1. ✅ **Docker & Database Setup** - Tüm servisler ayakta
