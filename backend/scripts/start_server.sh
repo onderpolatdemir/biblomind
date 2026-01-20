@@ -17,15 +17,18 @@ echo -e "${BLUE}║   🚀 BiblioMind Server Başlatılıyor   ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo ""
 
-# Backend dizinine git
-cd "$(dirname "$0")"
+# Backend dizinine git (scriptin bir üst dizini)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
 
 # Docker servislerini kontrol et
 echo -e "${YELLOW}→ Docker servislerini kontrol ediliyor...${NC}"
 if ! docker ps | grep -q "bibliomind-postgres"; then
     echo -e "${RED}✗ PostgreSQL container çalışmıyor!${NC}"
     echo -e "${YELLOW}  Docker servisleri başlatılıyor...${NC}"
-    cd ..
+    # Backend dizinindeyiz, bir üst dizine git (proje root)
+    PROJECT_ROOT="$(cd .. && pwd)"
+    cd "$PROJECT_ROOT"
     docker-compose up -d
     cd backend
     sleep 5
@@ -37,12 +40,8 @@ fi
 # venv'i aktifleştir
 echo -e "${YELLOW}→ Virtual environment aktifleştiriliyor...${NC}"
 if [ ! -d "venv" ]; then
-    echo -e "${RED}✗ venv bulunamadı!${NC}"
-    echo -e "${YELLOW}  venv oluşturuluyor...${NC}"
-    python -m venv venv
-    source venv/Scripts/activate
-    pip install -r requirements.txt
-    echo -e "${GREEN}✓ venv oluşturuldu ve paketler yüklendi${NC}"
+    echo -e "${RED}✗ venv bulunamadı! Backend dizininde venv oluştur.${NC}"
+    exit 1
 else
     source venv/Scripts/activate
     echo -e "${GREEN}✓ Virtual environment aktif${NC}"

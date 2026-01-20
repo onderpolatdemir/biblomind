@@ -68,15 +68,43 @@ bibliomind/
 └── README.md
 
 
-## 🚀 Kurulum
+## 🚀 Hızlı Başlangıç
+
+### ⚡ Backend Başlatma (Hazır!)
+
+```bash
+# 1. Docker servislerini başlat
+docker-compose up -d
+
+# 2. Backend'e git ve server'ı başlat
+cd backend
+./scripts/start_server.sh          # Git Bash / Linux / macOS
+# veya
+.\scripts\start_server.ps1          # Windows PowerShell
+
+# 3. Tarayıcıda aç
+# http://localhost:8000/docs
+```
+
+**✅ Tamamlanan:**
+- Docker & Database Setup
+- Auth API (JWT)
+- Books API (CRUD + pagination)
+- 20 kitap seed data
+
+**📚 Detaylı backend kurulumu:** [backend/README.md](backend/README.md)
+
+---
+
+## 🛠️ Kurulum (İlk Sefer)
 
 ### Gereksinimler
 
 - Python 3.11+
 - Node.js 18+
 - Docker & Docker Compose
-- Google Cloud Platform hesabı
-- OpenAI API key
+- Google Cloud Platform hesabı (Phase 2'de gerekli)
+- OpenAI API key (Phase 2'de gerekli)
 
 ### 1. Repository'yi klonlayın
 
@@ -119,12 +147,23 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 
 ## 🗺️ Geliştirme Yol Haritası
 
-### ✅ Faz 1: Altyapı (Hafta 1-4)
-- [x] Docker environment setup ✅ (13 Ocak 2026)
-- [x] PostgreSQL + pgvector kurulumu ✅ (13 Ocak 2026)
-- [ ] FastAPI temel yapı
+### ✅ Faz 1: Altyapı (Hafta 1-4) - TAMAMLANDI
+
+**Backend (Kaan):**
+- [x] **Görev 1:** Docker & Database Setup ✅ (20 Ocak 2026)
+- [x] **Görev 2:** Database Schema & Models (9 model) ✅ (20 Ocak 2026)
+- [x] **Görev 3:** FastAPI Core Setup ✅ (20 Ocak 2026)
+- [x] **Görev 4:** Authentication System (JWT + bcrypt) ✅ (20 Ocak 2026)
+- [x] **Görev 5:** Books API (CRUD + pagination) ✅ (20 Ocak 2026)
+
+**Frontend (Barış):**
 - [ ] Next.js frontend skeleton
-- [ ] JWT authentication
+- [ ] UI Components (shadcn/ui)
+- [ ] Auth sayfaları
+
+**E-commerce (Önder):**
+- [ ] Ödeme entegrasyonu araştırması
+- [ ] Sepet/Order UI tasarımı
 
 ### 🔄 Faz 2: AI Entegrasyonu (Hafta 5-8)
 - [ ] Google Cloud Vision API

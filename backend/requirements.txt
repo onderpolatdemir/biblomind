@@ -25,6 +25,7 @@ pydantic-settings>=2.7.0
 # Authentication
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt==4.0.1  # passlib uyumlu versiyon (4.1+ ile sorun var)
 python-multipart>=0.0.20
 
 # Background Tasks (Will be used in Week 9)

@@ -162,6 +162,57 @@ POST /api/auth/refresh ✅
 
 ---
 
+#### ✅ 1.5 Books API (CRUD) [3 gün]
+**Öncelik:** 🔴 Kritik - Barış ve Önder'e blocker  
+**Durum:** ✅ **TAMAMLANDI** (20 Ocak 2026)
+
+**Görevler:**
+- [x] Admin permission sistemi:
+  - [x] `User.is_admin` field (Boolean)
+  - [x] Migration: `b3a2c94e5f12_add_is_admin`
+  - [x] `get_current_admin_user` dependency (403 Forbidden)
+- [x] `backend/app/schemas/book.py`:
+  - [x] BookBase, BookCreate, BookUpdate
+  - [x] BookResponse, BookListResponse
+- [x] `backend/app/services/book_service.py`:
+  - [x] `get_books()` - Pagination + filters + sorting
+  - [x] `get_book_by_id()` - Single book
+  - [x] `create_book()`, `update_book()`, `delete_book()`
+  - [x] `check_isbn_exists()` - Uniqueness validation
+- [x] `backend/app/api/books.py` endpoints:
+  - [x] `GET /api/books` - Public list
+  - [x] `GET /api/books/{id}` - Public detail
+  - [x] `POST /api/books` - Admin create
+  - [x] `PUT /api/books/{id}` - Admin update
+  - [x] `DELETE /api/books/{id}` - Admin delete
+- [x] Features:
+  - [x] Pagination (page, page_size, total_pages)
+  - [x] Filters (genre, author, price range)
+  - [x] Sorting (title, author, price, created_at)
+  - [x] ISBN uniqueness check
+- [x] Seed data: `scripts/seed_books.py` (20 kitap)
+- [x] Router registration eklendi
+
+**Çıktı:** ✅ **Books API hazır ve test edildi**  
+**Entegrasyon:** ✅ **BLOCKER KALDIRILDI!**
+- **Barış:** Books list/detail pages yapabilir 📚
+- **Önder:** Cart API için book availability check yapabilir 🛒
+
+**Test:** Swagger UI'de 5 endpoint test edilebilir  
+**Rapor:** `docs/reports/TASK-05-BOOKS-API.md`  
+**Branch:** `kaan/feature/books-api`
+
+**API Contract Onaylandı:**
+```json
+GET /api/books ✅ (pagination + filters + sorting)
+GET /api/books/{id} ✅
+POST /api/books ✅ (admin only)
+PUT /api/books/{id} ✅ (admin only)
+DELETE /api/books/{id} ✅ (admin only)
+```
+
+---
+
 ### PHASE 2: AI/ML Entegrasyonu (Hafta 5-8) ⭐
 
 #### 🤖 2.1 OpenAI Services [5 gün]
