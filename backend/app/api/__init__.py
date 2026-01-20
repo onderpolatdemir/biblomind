@@ -1,7 +1,7 @@
 """API router registry."""
 
 from fastapi import APIRouter
-from app.api import health, auth, books, users, admin
+from app.api import health, auth, books, users, admin, vision
 
 # Create main API router
 api_router = APIRouter()
@@ -12,6 +12,8 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(books.router, prefix="/books", tags=["Books"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+
+api_router.include_router(vision.router, prefix="/vision", tags=["Vision"])
 
 # Future routers will be added here:
 # api_router.include_router(search.router, prefix="/search", tags=["Search"])
