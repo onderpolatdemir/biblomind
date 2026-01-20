@@ -2,7 +2,7 @@
 
 **Tarih:** 20 Ocak 2026  
 **Sprint:** Sprint 1 - Phase 1 Devam Ediyor  
-**Toplam İlerleme:** **%42** (5/12 temel görev)
+**Toplam İlerleme:** **%50** (6/12 temel görev)
 
 ---
 
@@ -10,18 +10,18 @@
 
 ### Tamamlanan Fazlar
 - ✅ **Sprint 0:** Planlama ve dokümantasyon (13 Ocak)
-- 🔄 **Sprint 1:** Phase 1 - Altyapı (%42 tamamlandı)
+- 🔄 **Sprint 1:** Phase 1 - Altyapı (%50 tamamlandı)
 
 ### Phase 1 İlerlemesi (Hafta 1-4)
 ```
-[██████████░░░░░░░░░░░░] %42
+[████████████░░░░░░░░░░] %50
 
 ✅ Görev 1: Docker & Database Setup       [TAMAMLANDI] 13 Ocak
 ✅ Görev 2: Database Schema & Models      [TAMAMLANDI] 13 Ocak
 ✅ Görev 3: FastAPI Core Setup            [TAMAMLANDI] 13 Ocak
 ✅ Görev 4: Authentication System         [TAMAMLANDI] 13 Ocak
-✅ Görev 5: Books API (CRUD)              [TAMAMLANDI] 20 Ocak 🆕
-⏳ Görev 6: Elasticsearch Search          [SIRADA]
+✅ Görev 5: Books API (CRUD)              [TAMAMLANDI] 20 Ocak
+✅ Görev 6: Elasticsearch Search          [TAMAMLANDI] 20 Ocak 🆕
 ⏳ Görev 7: User Preferences              [BEKLIYOR]
 ⏳ Görev 8: Admin Panel Backend           [BEKLIYOR]
 ```
@@ -31,6 +31,42 @@
 ## ✅ TAMAMLANANLAR
 
 ### 📅 20 Ocak 2026 (BUGÜN) 🆕
+
+#### 🎯 Görev 6: Elasticsearch Search ✅ (EN SON)
+**Branch:** `kaan/feature/books-api`
+
+**Yapılanlar:**
+1. **ElasticsearchService** 🔍
+   - Full-text search engine
+   - Fuzzy matching (typo tolerance)
+   - Multi-field search (title^3, author^2, description)
+   - Auto-sync with CRUD operations
+
+2. **Search Endpoint** (6. API endpoint)
+   - GET /api/books/search - Full-text search
+   - Pagination support
+   - Filter combination (genre, author, price)
+   - Relevance scoring
+
+3. **Book Schemas** 
+   - BookSearchResult - Individual result with score
+   - BookSearchResponse - Paginated results
+
+4. **Auto-Sync Integration**
+   - create_book() → Auto-index to ES
+   - update_book() → Auto-update in ES
+   - delete_book() → Auto-delete from ES
+
+5. **Indexing Script** 📚
+   - index_books_to_es.py
+   - 20 books successfully indexed
+
+6. **Dependency Fix**
+   - elasticsearch==8.11.1 (ES 8.11.0 uyumlu)
+
+**Rapor:** `docs/reports/TASK-06-ELASTICSEARCH.md`
+
+---
 
 #### 🎯 Görev 5: Books API (CRUD) ✅
 **Branch:** `kaan/feature/books-api`

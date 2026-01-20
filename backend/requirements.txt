@@ -10,7 +10,7 @@ alembic>=1.14.0
 
 # Caching & Search
 redis>=5.2.1
-elasticsearch>=8.16.0
+elasticsearch==8.11.1  # Compatible with ES 8.11.0 container
 
 # AI/ML (Will be used in Week 5)
 openai>=1.58.1

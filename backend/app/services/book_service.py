@@ -5,9 +5,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from uuid import UUID
 import math
+import logging
 
 from app.models.book import Book
 from app.schemas.book import BookCreate, BookUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class BookService:
@@ -120,6 +123,13 @@ class BookService:
         db.commit()
         db.refresh(db_book)
         
+        # Auto-sync to Elasticsearch
+        try:
+            from app.services.elasticsearch_service import es_service
+            es_service.index_book(db_book)
+        except Exception as e:
+            logger.warning(f"Failed to index book to Elasticsearch: {e}")
+        
         return db_book
     
     @staticmethod
@@ -151,6 +161,13 @@ class BookService:
         db.commit()
         db.refresh(db_book)
         
+        # Auto-sync to Elasticsearch
+        try:
+            from app.services.elasticsearch_service import es_service
+            es_service.update_book(book_id, db_book)
+        except Exception as e:
+            logger.warning(f"Failed to update book in Elasticsearch: {e}")
+        
         return db_book
     
     @staticmethod
@@ -171,6 +188,13 @@ class BookService:
         
         db.delete(db_book)
         db.commit()
+        
+        # Auto-sync to Elasticsearch
+        try:
+            from app.services.elasticsearch_service import es_service
+            es_service.delete_book(book_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete book from Elasticsearch: {e}")
         
         return True
     

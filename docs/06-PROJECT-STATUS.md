@@ -160,30 +160,32 @@ BiblioMind, fiziksel kitaplıkları dijital keşif alanına dönüştüren AI pl
 
 ### Sprint 1: Hafta 1-2 (13-26 Ocak 2026)
 
-#### 🔴 KAAN - Altyapı Kurulumu (**İlk 5 Görev Tamamlandı!** 🎉)
+#### 🔴 KAAN - Altyapı Kurulumu (**İlk 6 Görev Tamamlandı!** 🎉)
 - [x] Görev 1: Docker Compose setup (PostgreSQL, Redis, Elasticsearch) ✅ 13 Ocak 2026
 - [x] Görev 2: Database schema & migration (Alembic) ✅ 13 Ocak 2026
 - [x] Görev 3: FastAPI core setup ✅ 13 Ocak 2026
 - [x] Görev 4: JWT authentication API ✅ 13 Ocak 2026
 - [x] Görev 5: Books API (CRUD) ✅ 20 Ocak 2026
-- [ ] Görev 6: Elasticsearch Search (sırada)
+- [x] Görev 6: Elasticsearch Search ✅ 20 Ocak 2026
 - [ ] Görev 7: User Preferences System
 - [ ] Görev 8: Admin Panel Backend
 
-**Çıktı:** ✅ **Books API hazır!** → Barış ve Önder kullanabilir 🚀
+**Çıktı:** ✅ **Search API hazır!** → Full-text search aktif 🚀
 
 **Son Durum:** 
 - Docker servisleri çalışıyor (PostgreSQL:5433, Redis:6379, ES:9200)
 - 9 database modeli + 2 migration uygulandı (is_admin eklendi)
 - FastAPI core hazır (CORS, logging, health check)
 - Auth API tam fonksiyonel (register, login, me, refresh)
-- **Books API tam fonksiyonel (5 endpoint, pagination, filters)**
-- **Admin permission sistemi aktif**
-- **20 kitap seed data hazır**
+- Books API tam fonksiyonel (6 endpoint, pagination, filters)
+- **Elasticsearch search aktif (fuzzy matching, relevance scoring)**
+- **Auto-sync: Her CRUD işleminde ES güncellenir**
+- **20 kitap Elasticsearch'e index'lendi**
+- Admin permission sistemi aktif
 - Swagger UI: http://localhost:8000/docs
 - Server script: `./scripts/start_server.sh` veya `.ps1`
 
-**Sıradaki:** Görev 6 - Elasticsearch Search Integration
+**Sıradaki:** Görev 7 - User Preferences System veya Phase 2 (AI/ML)
 
 #### 🔵 BARIŞ - Frontend Foundation
 - [ ] Next.js + Tailwind setup

@@ -82,7 +82,7 @@ Server başladıktan sonra:
 | **ReDoc** | http://localhost:8000/redoc | - |
 | **Health Check** | http://localhost:8000/api/health | - |
 
-### Mevcut Endpoints (Görev 5'e kadar):
+### Mevcut Endpoints (Görev 6'ya kadar):
 
 **Authentication (4 endpoint):**
 - `POST /api/auth/register` - Yeni kullanıcı kaydı
@@ -90,14 +90,28 @@ Server başladıktan sonra:
 - `GET /api/auth/me` - Mevcut kullanıcı bilgisi (🔒)
 - `POST /api/auth/refresh` - Token yenileme
 
-**Books (5 endpoint):**
+**Books (6 endpoint):**
 - `GET /api/books` - Kitap listesi (pagination, filters)
+- `GET /api/books/search` - **Full-text search** (Elasticsearch, fuzzy matching) 🔍
 - `GET /api/books/{id}` - Tek kitap detayı
 - `POST /api/books` - Yeni kitap ekle (🔒 Admin)
 - `PUT /api/books/{id}` - Kitap güncelle (🔒 Admin)
 - `DELETE /api/books/{id}` - Kitap sil (🔒 Admin)
 
-🔒 = Authentication gerekli
+🔒 = Authentication gerekli  
+🔍 = Elasticsearch search
+
+**Search Examples:**
+```bash
+# Basic search
+GET /api/books/search?q=1984
+
+# Fuzzy search (typo tolerance)
+GET /api/books/search?q=Orwel  # Finds "Orwell"
+
+# Search with filters
+GET /api/books/search?q=fiction&genre=Science Fiction&max_price=50
+```
 
 ## 📁 Proje Yapısı
 
@@ -126,7 +140,8 @@ backend/
 │   │   └── book.py       # ✅ Book schemas (Görev 5)
 │   ├── services/         # Business logic
 │   │   ├── auth_service.py  # ✅ JWT & password hashing
-│   │   └── book_service.py  # ✅ Books CRUD (Görev 5)
+│   │   ├── book_service.py  # ✅ Books CRUD (Görev 5)
+│   │   └── elasticsearch_service.py  # ✅ Search service (Görev 6)
 │   └── main.py           # FastAPI application
 ├── alembic/              # Database migrations
 │   └── versions/
@@ -135,7 +150,8 @@ backend/
 ├── scripts/              # Utility scripts
 │   ├── start_server.sh   # ✅ Bash başlatma scripti (düzeltildi)
 │   ├── start_server.ps1  # PowerShell başlatma scripti
-│   └── seed_books.py     # ✅ 20 kitap seed data (Görev 5)
+│   ├── seed_books.py     # ✅ 20 kitap seed data (Görev 5)
+│   └── index_books_to_es.py  # ✅ Elasticsearch indexing (Görev 6)
 ├── docs/                 # Backend dokümantasyonu
 │   ├── QUICKSTART.md
 │   └── SERVER_COMMANDS.md
@@ -222,8 +238,9 @@ pytest tests/
 - ✅ **Görev 3:** FastAPI Core Setup
 - ✅ **Görev 4:** Authentication System (JWT + bcrypt)
 - ✅ **Görev 5:** Books API (CRUD + pagination + filters)
+- ✅ **Görev 6:** Elasticsearch Search (fuzzy matching + auto-sync)
 
-**Sıradaki:** Görev 6 - Elasticsearch Search Integration
+**Sıradaki:** Görev 7 - User Preferences System veya Phase 2 (AI/ML)
 
 ## 🆘 Yardım
 

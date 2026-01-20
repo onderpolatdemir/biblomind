@@ -155,6 +155,7 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 - [x] **Görev 3:** FastAPI Core Setup ✅ (20 Ocak 2026)
 - [x] **Görev 4:** Authentication System (JWT + bcrypt) ✅ (20 Ocak 2026)
 - [x] **Görev 5:** Books API (CRUD + pagination) ✅ (20 Ocak 2026)
+- [x] **Görev 6:** Elasticsearch Search (fuzzy matching + auto-sync) ✅ (20 Ocak 2026)
 
 **Frontend (Barış):**
 - [ ] Next.js frontend skeleton
