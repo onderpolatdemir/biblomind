@@ -3,7 +3,8 @@
 import os
 import logging
 import asyncio
-from typing import List, Dict, Any, Tuple
+import json
+from typing import List, Dict, Any, Tuple, Optional
 from google.cloud import vision
 from google.api_core import exceptions as google_exceptions
 from sqlalchemy.orm import Session
@@ -299,3 +300,221 @@ class VisionService:
             "total_detected": len(detected_texts),
             "total_matched": len(matched_books)
         }
+    
+    async def detect_and_clean_books(
+        self,
+        image_bytes: bytes,
+        openai_service
+    ) -> List[Dict[str, Any]]:
+        """
+        Tespit edilen kitapları OCR + AI ile temizle ve normalize et.
+        
+        Args:
+            image_bytes: Image file bytes
+            openai_service: OpenAI service instance
+            
+        Returns:
+            List of cleaned book information with confidence scores
+        """
+        # Step 1: OCR ile text tespit et
+        raw_texts = await self.detect_text_from_image(image_bytes)
+        
+        if not raw_texts:
+            logger.warning("No text detected from image")
+            return []
+        
+        logger.info(f"Detected {len(raw_texts)} raw texts from OCR")
+        
+        # Step 2: OpenAI ile kitap isimlerini düzelt ve normalize et
+        prompt = f"""Aşağıdaki OCR sonuçları bir kitap rafından alınmış ama hatalar içeriyor.
+Her satırı analiz et ve GERÇEKTEN BİR KİTAP ADI veya YAZAR İSMİ olup olmadığını belirle.
+
+OCR Sonuçları:
+{chr(10).join(raw_texts[:50])}
+
+Her tespit edilen kitap için şu formatta JSON döndür:
+{{
+  "title": "Kitap Adı",
+  "author": "Yazar Adı (eğer tespit edildiyse)",
+  "confidence": 0.9,
+  "genres": ["Tür1", "Tür2"],
+  "original_ocr": "orijinal OCR text"
+}}
+
+Önemli:
+- Kitap adı değilse (barkod, numara, anlamsız text), dahil etme
+- Türkçe karakterleri düzgün yaz (ş, ğ, ü, ö, ç, ı)
+- Confidence 0-1 arası olsun
+- Sadece JSON array döndür, başka açıklama yapma
+
+JSON array:"""
+        
+        try:
+            response = await openai_service.generate_completion(
+                prompt=prompt,
+                max_tokens=2000,
+                temperature=0.3
+            )
+            
+            # Clean response (remove markdown code blocks if present)
+            cleaned_response = response.strip()
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]  # Remove ```json
+            if cleaned_response.startswith("```"):
+                cleaned_response = cleaned_response[3:]  # Remove ```
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+            cleaned_response = cleaned_response.strip()
+            
+            # Parse JSON response
+            detected_books = json.loads(cleaned_response)
+            
+            # Filter by confidence
+            filtered_books = [
+                book for book in detected_books 
+                if isinstance(book, dict) and book.get('confidence', 0) > 0.6
+            ]
+            
+            logger.info(f"AI cleaned books: {len(filtered_books)} valid books found")
+            
+            return filtered_books
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse OpenAI response: {e}")
+            logger.error(f"Response was: {response[:500]}")
+            return []
+        except Exception as e:
+            logger.error(f"Error in detect_and_clean_books: {e}")
+            return []
+    
+    async def match_books_to_user_profile(
+        self,
+        detected_books: List[Dict[str, Any]],
+        user_profile: Dict[str, Any],
+        db: Session,
+        openai_service,
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Tespit edilen kitapları kullanıcı profili ile eşleştir ve öner.
+        
+        Args:
+            detected_books: Raftaki tespit edilen kitaplar
+            user_profile: Kullanıcının okuma profili
+            db: Database session
+            openai_service: OpenAI service instance
+            limit: Maksimum öneri sayısı
+            
+        Returns:
+            Dict with recommendations and shelf analysis
+        """
+        if not detected_books:
+            return {
+                "recommendations": [],
+                "shelf_analysis": {},
+                "total_analyzed": 0
+            }
+        
+        logger.info(f"Matching {len(detected_books)} books to user profile")
+        
+        # Step 1: OpenAI ile kitapları kullanıcı profiline göre skorla
+        prompt = f"""Kullanıcı Okuma Profili:
+{json.dumps(user_profile, ensure_ascii=False, indent=2)}
+
+Kitaplıktaki Kitaplar:
+{json.dumps(detected_books[:30], ensure_ascii=False, indent=2)}
+
+Bu kullanıcı için kitaplıktaki hangi kitapları önerirsin?
+Her kitap için 0-1 arası match_score ver ve neden önerdiğini açıkla.
+
+Ayrıca raf analizi yap:
+- Raftaki genel türler neler?
+- Raf sahibinin okuma tarzı nasıl?
+- Kullanıcı ile raf uyumluluğu ne kadar? (0-1)
+
+JSON formatında döndür:
+{{
+  "recommendations": [
+    {{
+      "title": "Kitap Adı",
+      "author": "Yazar",
+      "match_score": 0.95,
+      "reason": "Neden öneriliyor açıklama"
+    }}
+  ],
+  "shelf_analysis": {{
+    "dominant_genres": ["Tür1", "Tür2"],
+    "reading_style": "Raf sahibinin okuma tarzı açıklaması",
+    "user_compatibility": 0.75
+  }}
+}}
+
+Sadece match_score > 0.6 olanları dahil et ve score'a göre sıralı döndür.
+Sadece JSON döndür:"""
+        
+        try:
+            response = await openai_service.generate_completion(
+                prompt=prompt,
+                max_tokens=2000,
+                temperature=0.5
+            )
+            
+            # Clean response (remove markdown code blocks if present)
+            cleaned_response = response.strip()
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.startswith("```"):
+                cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+            
+            result = json.loads(cleaned_response)
+            recommendations = result.get('recommendations', [])[:limit]
+            shelf_analysis = result.get('shelf_analysis', {})
+            
+            # Step 2: DB'de bu kitapları kontrol et (satın alma linki için)
+            enriched_recommendations = []
+            for rec in recommendations:
+                title = rec.get('title', '')
+                author = rec.get('author', '')
+                
+                # DB'de kitabı ara
+                book_in_db = None
+                if title:
+                    book_in_db = db.query(Book).filter(
+                        Book.title.ilike(f"%{title}%")
+                    ).first()
+                
+                enriched_rec = {
+                    **rec,
+                    "in_our_store": book_in_db is not None,
+                    "book_id": str(book_in_db.id) if book_in_db else None,
+                    "price": float(book_in_db.price) if book_in_db and book_in_db.price else None,
+                    "cover_url": book_in_db.cover_url if book_in_db else None
+                }
+                
+                enriched_recommendations.append(enriched_rec)
+            
+            logger.info(f"Generated {len(enriched_recommendations)} recommendations")
+            
+            return {
+                "recommendations": enriched_recommendations,
+                "shelf_analysis": shelf_analysis,
+                "total_analyzed": len(detected_books)
+            }
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse OpenAI matching response: {e}")
+            return {
+                "recommendations": [],
+                "shelf_analysis": {},
+                "total_analyzed": len(detected_books)
+            }
+        except Exception as e:
+            logger.error(f"Error in match_books_to_user_profile: {e}")
+            return {
+                "recommendations": [],
+                "shelf_analysis": {},
+                "total_analyzed": len(detected_books)
+            }

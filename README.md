@@ -86,7 +86,9 @@ cd backend
 # http://localhost:8000/docs
 ```
 
-**✅ Tamamlanan (Phase 1 - %100!):**
+**✅ Tamamlanan:**
+
+**Phase 1 - Infrastructure (%100):**
 - Docker & Database Setup
 - Auth API (JWT) - 4 endpoint
 - Books API (CRUD + pagination + search) - 6 endpoint  
@@ -94,7 +96,25 @@ cd backend
 - Admin Panel API - 6 endpoint
 - Elasticsearch Search Integration
 - 20 kitap seed data
-- **Toplam: 25 API endpoint hazır**
+- **Toplam: 25 API endpoint**
+
+**Phase 2.1 - OpenAI Services (%100):**
+- OpenAI text embeddings (1536 dimensions)
+- GPT-4o personalized explanations
+- Redis caching + token tracking
+- LangChain integration
+- **Docs:** `backend/docs/OPENAI-SERVICE.md`
+
+**Phase 2.2 - Vision API + Bookshelf Matching (%100):**
+- Google Cloud Vision OCR (4-direction rotation)
+- AI-powered book detection (OCR error correction)
+- Smart bookshelf matching system
+- User reading profile generation (AI-based)
+- Shelf analysis + compatibility scoring
+- **2 new endpoints:** `/api/vision/match-shelf`, `/api/vision/test`
+- **Docs:** `backend/docs/SHELF-MATCHING.md`
+
+**🚀 Sırada:** Phase 2.3 - Recommendation Engine
 
 **📚 Detaylı backend kurulumu:** [backend/README.md](backend/README.md)
 

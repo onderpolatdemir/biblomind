@@ -1,6 +1,8 @@
 """User service for profile and preferences management."""
 
-from typing import Optional, List
+import json
+import logging
+from typing import Optional, List, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -10,6 +12,8 @@ from app.models.user import User
 from app.models.user_interaction import UserInteraction
 from app.models.book import Book
 from app.schemas.user import UserPreferencesUpdate, UserProfileUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -297,3 +301,133 @@ class UserService:
             return True
         
         return False
+    
+    @staticmethod
+    async def get_user_reading_profile(
+        db: Session,
+        user_id: UUID,
+        openai_service
+    ) -> Dict[str, Any]:
+        """
+        Kullanıcının okuma geçmişinden AI ile profil oluştur.
+        
+        Args:
+            db: Database session
+            user_id: User ID
+            openai_service: OpenAI service instance
+            
+        Returns:
+            Dict with user reading profile (favorite genres, authors, themes, style)
+        """
+        logger.info(f"Creating reading profile for user {user_id}")
+        
+        # Kullanıcının beğendiği/okuduğu kitapları al
+        liked_interactions = db.query(UserInteraction).filter(
+            UserInteraction.user_id == user_id,
+            UserInteraction.interaction_type.in_(['like', 'purchase'])
+        ).limit(50).all()
+        
+        if not liked_interactions:
+            # Eğer hiç interaction yoksa, default profil döndür
+            logger.warning(f"No interactions found for user {user_id}, returning default profile")
+            return {
+                "favorite_genres": [],
+                "favorite_authors": [],
+                "themes": [],
+                "style_preferences": [],
+                "reading_level": "intermediate",
+                "has_history": False
+            }
+        
+        # Kitap bilgilerini topla
+        books = []
+        for interaction in liked_interactions:
+            if interaction.book:
+                books.append({
+                    "title": interaction.book.title,
+                    "author": interaction.book.author,
+                    "genres": interaction.book.genres or [],
+                    "description": interaction.book.description[:200] if interaction.book.description else ""
+                })
+        
+        if not books:
+            logger.warning(f"No books found for user {user_id}, returning default profile")
+            return {
+                "favorite_genres": [],
+                "favorite_authors": [],
+                "themes": [],
+                "style_preferences": [],
+                "reading_level": "intermediate",
+                "has_history": False
+            }
+        
+        logger.info(f"Found {len(books)} books for user profile analysis")
+        
+        # OpenAI ile profil oluştur
+        prompt = f"""Kullanıcının beğendiği/satın aldığı kitaplar:
+{json.dumps(books[:20], ensure_ascii=False, indent=2)}
+
+Bu kullanıcının okuma profilini çıkar ve JSON formatında döndür:
+{{
+  "favorite_genres": ["Tür1", "Tür2", "Tür3"],
+  "favorite_authors": ["Yazar1", "Yazar2"],
+  "themes": ["tema1", "tema2", "tema3"],
+  "style_preferences": ["karanlık", "düşündürücü", "aksiyon dolu"],
+  "reading_level": "beginner|intermediate|advanced"
+}}
+
+Sadece JSON döndür, başka açıklama yapma:"""
+        
+        try:
+            response = await openai_service.generate_completion(
+                prompt=prompt,
+                max_tokens=800,
+                temperature=0.4
+            )
+            
+            # Clean response (remove markdown code blocks if present)
+            cleaned_response = response.strip()
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.startswith("```"):
+                cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+            
+            profile = json.loads(cleaned_response)
+            profile['has_history'] = True
+            
+            logger.info(f"Successfully created reading profile for user {user_id}")
+            return profile
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse OpenAI profile response: {e}")
+            logger.error(f"Response was: {response[:500]}")
+            # Fallback: basit profil oluştur
+            genres = set()
+            authors = set()
+            for book in books:
+                if book.get('genres'):
+                    genres.update(book['genres'])
+                if book.get('author'):
+                    authors.add(book['author'])
+            
+            return {
+                "favorite_genres": list(genres)[:5],
+                "favorite_authors": list(authors)[:5],
+                "themes": [],
+                "style_preferences": [],
+                "reading_level": "intermediate",
+                "has_history": True
+            }
+        except Exception as e:
+            logger.error(f"Error creating reading profile: {e}")
+            return {
+                "favorite_genres": [],
+                "favorite_authors": [],
+                "themes": [],
+                "style_preferences": [],
+                "reading_level": "intermediate",
+                "has_history": False
+            }

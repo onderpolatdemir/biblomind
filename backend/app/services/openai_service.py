@@ -201,6 +201,72 @@ class OpenAIService:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True
     )
+    async def generate_completion(
+        self,
+        prompt: str,
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+        system_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Generate a text completion using GPT-4o.
+        
+        Args:
+            prompt: User prompt/question
+            max_tokens: Maximum tokens in response
+            temperature: Sampling temperature (0-2)
+            system_prompt: Optional system prompt
+            
+        Returns:
+            Generated text response
+            
+        Raises:
+            OpenAIError: If API call fails after retries
+        """
+        try:
+            # Build messages
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
+            logger.debug(f"Generating completion (max_tokens={max_tokens}, temp={temperature})")
+            
+            # Call OpenAI API
+            response = await self.client.chat.completions.create(
+                model=settings.OPENAI_LLM_MODEL,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+            
+            # Extract completion
+            completion = response.choices[0].message.content.strip()
+            
+            # Track token usage
+            await self._track_token_usage(
+                model=settings.OPENAI_LLM_MODEL,
+                input_tokens=response.usage.prompt_tokens,
+                output_tokens=response.usage.completion_tokens
+            )
+            
+            logger.info(
+                f"Successfully generated completion "
+                f"({len(completion)} chars, {response.usage.total_tokens} tokens)"
+            )
+            
+            return completion
+            
+        except RateLimitError as e:
+            logger.error(f"OpenAI rate limit exceeded: {e}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"OpenAI API connection error: {e}")
+            raise
+        except OpenAIError as e:
+            logger.error(f"OpenAI API error: {e}")
+            raise
+    
     async def generate_explanation(
         self,
         user_profile: Dict[str, Any],

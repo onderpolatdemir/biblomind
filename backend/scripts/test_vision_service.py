@@ -22,6 +22,8 @@ import asyncio
 import sys
 from pathlib import Path
 import argparse
+import json
+from datetime import datetime
 
 # Add backend to path
 backend_dir = Path(__file__).parent.parent
@@ -123,7 +125,7 @@ async def test_fuzzy_matching(image_path: Path):
     
     if not image_path.exists():
         print("⚠️  Image not found, skipping fuzzy matching test")
-        return True
+        return True, None
     
     try:
         service = VisionService()
@@ -157,13 +159,35 @@ async def test_fuzzy_matching(image_path: Path):
         
         print("-" * 60)
         
-        return True
+        # Save results to file
+        output_data = {
+            "timestamp": datetime.now().isoformat(),
+            "image_path": str(image_path),
+            "image_name": image_path.name,
+            "detected_texts": result['detected_texts'],
+            "matched_books": result['matched_books'],
+            "total_detected": result['total_detected'],
+            "total_matched": result['total_matched']
+        }
+        
+        # Save to JSON file
+        output_dir = backend_dir / "test_results"
+        output_dir.mkdir(exist_ok=True)
+        
+        output_file = output_dir / f"vision_results_{image_path.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"\n📄 Results saved to: {output_file.relative_to(backend_dir)}")
+        
+        return True, output_data
         
     except Exception as e:
         print(f"❌ FAILED: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return False, None
 
 
 async def test_performance(image_path: Path):
@@ -252,11 +276,18 @@ async def main():
     ]
     
     results = []
+    vision_results = None
     
     for test_name, test_func in tests:
         try:
             result = await test_func()
-            results.append((test_name, result))
+            # Fuzzy matching returns tuple (success, data)
+            if test_name == "Fuzzy Matching" and isinstance(result, tuple):
+                success, data = result
+                vision_results = data
+                results.append((test_name, success))
+            else:
+                results.append((test_name, result))
         except Exception as e:
             print(f"\n❌ Test '{test_name}' crashed: {e}")
             results.append((test_name, False))
