@@ -82,24 +82,56 @@ Server başladıktan sonra:
 | **ReDoc** | http://localhost:8000/redoc | - |
 | **Health Check** | http://localhost:8000/api/health | - |
 
-### Mevcut Endpoints (Görev 6'ya kadar):
+### Mevcut Endpoints (Phase 1 & 2.1-2.3):
 
 **Authentication (4 endpoint):**
 - `POST /api/auth/register` - Yeni kullanıcı kaydı
-- `POST /api/auth/login` - Kullanıcı girişi
+- `POST /api/auth/login` - Kullanıcı girişi (JWT token)
 - `GET /api/auth/me` - Mevcut kullanıcı bilgisi (🔒)
 - `POST /api/auth/refresh` - Token yenileme
 
 **Books (6 endpoint):**
 - `GET /api/books` - Kitap listesi (pagination, filters)
-- `GET /api/books/search` - **Full-text search** (Elasticsearch, fuzzy matching) 🔍
+- `GET /api/books/search` - Full-text search (Elasticsearch) 🔍
 - `GET /api/books/{id}` - Tek kitap detayı
 - `POST /api/books` - Yeni kitap ekle (🔒 Admin)
 - `PUT /api/books/{id}` - Kitap güncelle (🔒 Admin)
 - `DELETE /api/books/{id}` - Kitap sil (🔒 Admin)
 
+**User Preferences (9 endpoint):**
+- `GET /api/me/favorites` - Favori kitaplar (🔒)
+- `POST /api/me/favorites/{book_id}` - Favorilere ekle (🔒)
+- `DELETE /api/me/favorites/{book_id}` - Favorilerden çıkar (🔒)
+- `GET /api/me/cart` - Sepet (🔒)
+- `POST /api/me/cart/{book_id}` - Sepete ekle (🔒)
+- `DELETE /api/me/cart/{book_id}` - Sepetten çıkar (🔒)
+- `GET /api/me/interactions` - Etkileşim geçmişi (🔒)
+- `POST /api/me/interactions` - Yeni etkileşim (🔒)
+- `GET /api/me/purchased` - Satın alınan kitaplar (🔒)
+
+**Admin Panel (6 endpoint):**
+- `GET /api/admin/users` - Tüm kullanıcılar (🔒 Admin)
+- `GET /api/admin/users/{id}` - Kullanıcı detayı (🔒 Admin)
+- `PUT /api/admin/users/{id}` - Kullanıcı güncelle (🔒 Admin)
+- `DELETE /api/admin/users/{id}` - Kullanıcı sil (🔒 Admin)
+- `GET /api/admin/stats` - İstatistikler (🔒 Admin)
+- `POST /api/admin/seed` - Test data yükle (🔒 Admin)
+
+**Vision API (3 endpoint):**
+- `GET /api/vision/health` - Vision service health check
+- `POST /api/vision/test` - OCR testi (base64 image) (🔒)
+- `POST /api/vision/match-shelf` - Akıllı kitaplık eşleştirme (🔒) 🤖
+
+**Recommendations (3 endpoint):**
+- `GET /api/recommendations` - Kişiselleştirilmiş öneriler (🔒) 🤖
+- `GET /api/recommendations/similar/{book_id}` - Benzer kitaplar (🔒) 🤖
+- `POST /api/recommendations/refresh` - Tercih vektörü güncelle (🔒) 🤖
+
 🔒 = Authentication gerekli  
-🔍 = Elasticsearch search
+🔍 = Elasticsearch search  
+🤖 = AI-powered
+
+**TOPLAM: 34 API ENDPOINT**
 
 **Search Examples:**
 ```bash
@@ -120,41 +152,63 @@ backend/
 ├── app/
 │   ├── api/              # API endpoints
 │   │   ├── __init__.py   # Router registry
-│   │   ├── auth.py       # ✅ Auth endpoints (Görev 4)
-│   │   ├── books.py      # ✅ Books endpoints (Görev 5)
+│   │   ├── auth.py       # ✅ Auth (4 endpoints)
+│   │   ├── books.py      # ✅ Books (6 endpoints)
+│   │   ├── users.py      # ✅ User Preferences (9 endpoints)
+│   │   ├── admin.py      # ✅ Admin Panel (6 endpoints)
+│   │   ├── vision.py     # ✅ Vision API (3 endpoints)
+│   │   ├── recommendations.py # ✅ Recommendations (3 endpoints)
 │   │   ├── deps.py       # Auth dependencies
 │   │   └── health.py     # Health check
 │   ├── core/             # Core modules
 │   │   ├── config.py     # Configuration
-│   │   ├── database.py   # Database connection
+│   │   ├── database.py   # Database connection (pgvector)
 │   │   ├── logging.py    # Logging setup
 │   │   └── middleware.py # Custom middlewares
-│   ├── models/           # SQLAlchemy models (9 model)
-│   │   ├── user.py       # ✅ is_admin eklendi
-│   │   ├── book.py
-│   │   ├── cart.py
-│   │   ├── order.py
-│   │   └── ...
+│   ├── models/           # SQLAlchemy models
+│   │   ├── user.py       # ✅ User + preferences_vector
+│   │   ├── book.py       # ✅ Book + embedding (1536-dim)
+│   │   ├── cart.py       # ✅ Shopping cart
+│   │   ├── order.py      # ✅ Orders
+│   │   ├── user_interaction.py # ✅ Interactions (like/view/cart/purchase)
+│   │   └── photo_scan.py # ✅ Vision scans
 │   ├── schemas/          # Pydantic schemas
 │   │   ├── auth.py       # ✅ Auth schemas
-│   │   └── book.py       # ✅ Book schemas (Görev 5)
+│   │   ├── book.py       # ✅ Book schemas
+│   │   ├── user.py       # ✅ User schemas
+│   │   ├── admin.py      # ✅ Admin schemas
+│   │   └── recommendation.py # ✅ Recommendation schemas
 │   ├── services/         # Business logic
 │   │   ├── auth_service.py  # ✅ JWT & password hashing
-│   │   ├── book_service.py  # ✅ Books CRUD (Görev 5)
-│   │   └── elasticsearch_service.py  # ✅ Search service (Görev 6)
+│   │   ├── book_service.py  # ✅ Book CRUD
+│   │   ├── user_service.py  # ✅ User interactions
+│   │   ├── admin_service.py # ✅ Admin operations
+│   │   ├── elasticsearch_service.py # ✅ Full-text search
+│   │   ├── openai_service.py # ✅ Embeddings + GPT-4o (Phase 2.1)
+│   │   ├── vision_service.py # ✅ OCR + Book detection (Phase 2.2)
+│   │   └── recommendation_service.py # ✅ Recommendations (Phase 2.3)
 │   └── main.py           # FastAPI application
 ├── alembic/              # Database migrations
 │   └── versions/
 │       ├── 4251afb851f4_initial_schema.py
-│       └── b3a2c94e5f12_add_is_admin.py  # ✅ Görev 5
+│       └── b3a2c94e5f12_add_is_admin.py
 ├── scripts/              # Utility scripts
-│   ├── start_server.sh   # ✅ Bash başlatma scripti (düzeltildi)
-│   ├── start_server.ps1  # PowerShell başlatma scripti
-│   ├── seed_books.py     # ✅ 20 kitap seed data (Görev 5)
-│   └── index_books_to_es.py  # ✅ Elasticsearch indexing (Görev 6)
+│   ├── start_server.sh   # ✅ Bash server başlatma
+│   ├── start_server.ps1  # ✅ PowerShell server başlatma
+│   ├── create_admin.py   # ✅ Admin kullanıcı oluşturma
+│   ├── seed_books.py     # ✅ 20 kitap seed data
+│   ├── index_books_to_es.py # ✅ Elasticsearch indexing
+│   ├── generate_book_embeddings.py # ✅ Book embeddings (Phase 2.3)
+│   ├── seed_interactions.py # ✅ Test user interactions (Phase 2.3)
+│   └── test_recommendations.py # ✅ Recommendation tests (Phase 2.3)
 ├── docs/                 # Backend dokümantasyonu
 │   ├── QUICKSTART.md
-│   └── SERVER_COMMANDS.md
+│   ├── SERVER_COMMANDS.md
+│   ├── OPENAI-SERVICE.md # ✅ Phase 2.1 docs
+│   ├── GCP-VISION-SETUP.md # ✅ Phase 2.2 docs
+│   ├── VISION-SERVICE.md # ✅ Phase 2.2 docs
+│   ├── SHELF-MATCHING.md # ✅ Phase 2.2 docs
+│   └── RECOMMENDATION-ENGINE.md # ✅ Phase 2.3 docs
 ├── .env                  # Environment variables
 ├── requirements.txt      # Python dependencies
 └── README.md            # Bu dosya

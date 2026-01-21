@@ -1,8 +1,9 @@
 """User API endpoints for profile and preferences management."""
 
+import logging
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -10,6 +11,7 @@ from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.book import Book
 from app.services.user_service import UserService
+from app.services.recommendation_service import RecommendationService
 from app.schemas.user import (
     UserResponse,
     UserWithPreferences,
@@ -20,6 +22,8 @@ from app.schemas.user import (
     InteractionResponse
 )
 from app.schemas.book import BookResponse
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -185,9 +189,37 @@ async def get_interaction_history(
     return interactions
 
 
+async def _update_user_vector_background(db: Session, user_id: UUID):
+    """
+    Background task to update user's preference vector.
+    
+    This runs asynchronously after the interaction is saved,
+    so the API response is not delayed.
+    
+    Args:
+        db: Database session
+        user_id: User UUID
+    """
+    try:
+        logger.info(f"Background task: Updating preference vector for user {user_id}")
+        
+        rec_service = RecommendationService(db)
+        result = await rec_service.update_user_preference_vector(user_id)
+        await rec_service.close()
+        
+        logger.info(
+            f"Background task completed: Vector updated={result['vector_updated']}, "
+            f"Interactions processed={result['interactions_processed']}"
+        )
+    except Exception as e:
+        logger.error(f"Background task failed: {e}")
+        # Don't raise - background task failures shouldn't affect the main request
+
+
 @router.post("/me/interactions", response_model=InteractionResponse, status_code=status.HTTP_201_CREATED)
 async def create_interaction(
     interaction: InteractionCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -200,9 +232,15 @@ async def create_interaction(
     - cart: User added book to cart
     - purchase: User purchased the book
     
+    **Background Processing:**
+    After saving the interaction, the user's preference vector is automatically
+    updated in the background. This ensures recommendations stay fresh without
+    slowing down the API response.
+    
     Note: For 'like' interactions, use POST /me/favorites/{book_id} endpoint instead.
     This endpoint is primarily for tracking 'view' events from the frontend.
     """
+    # 1. Save interaction to database
     created_interaction = UserService.add_user_interaction(
         db,
         current_user.id,
@@ -210,4 +248,18 @@ async def create_interaction(
         interaction.interaction_type
     )
     
+    # 2. Schedule background task to update preference vector
+    # Only update for meaningful interactions (not just views)
+    if interaction.interaction_type in ['like', 'purchase', 'cart']:
+        logger.info(
+            f"Scheduling preference vector update for user {current_user.id} "
+            f"(interaction type: {interaction.interaction_type})"
+        )
+        background_tasks.add_task(
+            _update_user_vector_background,
+            db=db,
+            user_id=current_user.id
+        )
+    
+    # 3. Return immediately (background task runs after response is sent)
     return created_interaction
