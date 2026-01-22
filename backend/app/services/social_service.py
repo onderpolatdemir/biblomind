@@ -42,7 +42,7 @@ class SocialService:
             Similarity score (0.0-1.0)
         """
         # Both users must have preference vectors
-        if not (user_a.preferences_vector and user_b.preferences_vector):
+        if user_a.preferences_vector is None or user_b.preferences_vector is None:
             return 0.0
         
         try:

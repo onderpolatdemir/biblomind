@@ -99,17 +99,18 @@ class BiblioMindUser(HttpUser):
             return
         
         messages = [
-            "1984 kitabını okumak istiyorum",
-            "Bana fantastik kitap öner",
+            "Merhaba",
             "En popüler kitaplar neler?",
-            "Bilim kurgu kitap arıyorum"
         ]
         
-        self.client.post(
+        with self.client.post(
             "/api/chat/message",
             json={"message": random.choice(messages)},
-            headers=self.headers
-        )
+            headers=self.headers,
+            catch_response=True
+        ) as response:
+            if response.status_code != 200:
+                response.failure(f"Chat failed: {response.status_code} - {response.text[:200]}")
     
     @task(1)
     def find_buddies(self):

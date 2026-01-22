@@ -23,8 +23,17 @@ class OpenAIService:
     
     def __init__(self):
         """Initialize OpenAI client and Redis cache."""
-        # Initialize async OpenAI client
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # Validate API key
+        if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "your-openai-api-key":
+            logger.error("OPENAI_API_KEY not configured!")
+            raise ValueError("OPENAI_API_KEY must be configured in .env file")
+        
+        # Initialize async OpenAI client with timeout
+        self.client = AsyncOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            timeout=30.0,  # 30 second timeout
+            max_retries=2
+        )
         
         # Initialize Redis client for caching
         self.redis_client: Optional[redis.Redis] = None

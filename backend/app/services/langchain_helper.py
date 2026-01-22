@@ -16,19 +16,28 @@ class LangChainHelper:
     
     def __init__(self):
         """Initialize LangChain components."""
-        # Initialize ChatOpenAI for conversations
+        # Validate API key
+        if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "your-openai-api-key":
+            logger.error("OPENAI_API_KEY not configured!")
+            raise ValueError("OPENAI_API_KEY must be configured in .env file")
+        
+        # Initialize ChatOpenAI for conversations with timeout
         self.chat_model = ChatOpenAI(
             model=settings.OPENAI_LLM_MODEL,
             temperature=settings.OPENAI_TEMPERATURE,
             max_tokens=settings.OPENAI_MAX_TOKENS,
-            openai_api_key=settings.OPENAI_API_KEY
+            openai_api_key=settings.OPENAI_API_KEY,
+            timeout=30,  # 30 second timeout
+            max_retries=2
         )
         
-        # Initialize OpenAI embeddings
+        # Initialize OpenAI embeddings with timeout
         self.embeddings = OpenAIEmbeddings(
             model=settings.OPENAI_EMBEDDING_MODEL,
             dimensions=settings.OPENAI_EMBEDDING_DIMENSIONS,
-            openai_api_key=settings.OPENAI_API_KEY
+            openai_api_key=settings.OPENAI_API_KEY,
+            timeout=30,  # 30 second timeout
+            max_retries=2
         )
         
         logger.info("LangChain helper initialized")

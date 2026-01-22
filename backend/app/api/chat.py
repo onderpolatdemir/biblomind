@@ -52,8 +52,8 @@ router = APIRouter()
 )
 @limiter.limit("10/minute")
 async def send_message(
-    http_request: Request,
-    request: ChatMessageRequest,
+    request: Request,
+    chat_request: ChatMessageRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -61,7 +61,7 @@ async def send_message(
     Send a chat message and receive AI response.
     
     Args:
-        request: Message request with content and optional conversation_id
+        chat_request: Message request with content and optional conversation_id
         db: Database session
         current_user: Authenticated user
         
@@ -71,7 +71,7 @@ async def send_message(
     try:
         logger.info(
             f"POST /api/chat/message - User: {current_user.id}, "
-            f"Conversation: {request.conversation_id}, Message length: {len(request.message)}"
+            f"Conversation: {chat_request.conversation_id}, Message length: {len(chat_request.message)}"
         )
         
         # Initialize chat service
@@ -80,8 +80,8 @@ async def send_message(
         # Send message and get response
         result = await chat_service.send_message(
             user_id=current_user.id,
-            message=request.message,
-            conversation_id=request.conversation_id
+            message=chat_request.message,
+            conversation_id=chat_request.conversation_id
         )
         
         # Close connections

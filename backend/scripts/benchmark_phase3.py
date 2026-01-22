@@ -8,11 +8,15 @@ Measures response times for critical operations.
 import sys
 import time
 import asyncio
+import logging
 from pathlib import Path
 from statistics import mean, median
 
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
+
+# Disable SQLAlchemy query logging for cleaner output
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 from app.core.database import SessionLocal
 from app.models.user import User
