@@ -98,6 +98,14 @@ cd backend
 - 20 kitap seed data
 - **Toplam: 25 API endpoint**
 
+**Phase 2 - AI Integration (%100):**
+- OpenAI Services + LangChain Integration
+- Google Vision API + Bookshelf Matching - 2 endpoint
+- Recommendation Engine - 3 endpoint
+- RAG-Powered Chatbot - 5 endpoint
+- **Phase 2 Toplam: 10 API endpoint**
+- **GENEL TOPLAM: 35 API endpoint**
+
 **Phase 2.1 - OpenAI Services (%100):**
 - OpenAI text embeddings (1536 dimensions)
 - GPT-4o personalized explanations
@@ -123,6 +131,17 @@ cd backend
 - **3 new endpoints:** `/api/recommendations`, `/api/recommendations/similar/{id}`, `/api/recommendations/refresh`
 - **Performance:** <150ms (hedef 500ms)
 - **Docs:** `backend/docs/RECOMMENDATION-ENGINE.md`
+
+**Phase 2.4 - LangChain Integration & RAG Chatbot (%100):**
+- RAG (Retrieval Augmented Generation) pipeline
+- Fuzzy book detection (threshold: 0.70)
+- HYBRID strategy (book_detection / recommendation_engine / popular_books / no_books)
+- Conversation management (max 5 per user)
+- Auto-generated conversation titles (GPT-4o)
+- Semantic search with pgvector (cosine distance)
+- **5 new endpoints:** `/api/chat/message`, `/api/chat/conversations`, `/api/chat/conversations/{id}`, etc.
+- **Test Suite:** 8 scenarios, all passing ✅
+- **Docs:** `backend/docs/CHATBOT-SERVICE.md`, `backend/docs/RAG-PIPELINE.md`, `backend/docs/PHASE-2.4-COMPLETED.md`
 
 **🚀 Sırada:** Phase 2.4 - LangChain Integration
 

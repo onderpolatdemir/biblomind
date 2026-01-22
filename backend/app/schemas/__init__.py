@@ -13,6 +13,14 @@ from app.schemas.book import (
     BookResponse,
     BookListResponse,
 )
+from app.schemas.chat import (
+    ChatMessageRequest,
+    ChatMessageResponse,
+    ConversationResponse,
+    ConversationDetailResponse,
+    ConversationListResponse,
+    ConversationTitleUpdate,
+)
 
 __all__ = [
     "UserCreate",
@@ -24,4 +32,10 @@ __all__ = [
     "BookUpdate",
     "BookResponse",
     "BookListResponse",
+    "ChatMessageRequest",
+    "ChatMessageResponse",
+    "ConversationResponse",
+    "ConversationDetailResponse",
+    "ConversationListResponse",
+    "ConversationTitleUpdate",
 ]
