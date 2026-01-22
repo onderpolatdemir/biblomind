@@ -82,7 +82,7 @@ Server başladıktan sonra:
 | **ReDoc** | http://localhost:8000/redoc | - |
 | **Health Check** | http://localhost:8000/api/health | - |
 
-### Mevcut Endpoints (Phase 1 & 2.1-2.3):
+### Mevcut Endpoints (Phase 1, 2 & 3 - TAMAMLANDI ✅):
 
 **Authentication (4 endpoint):**
 - `POST /api/auth/register` - Yeni kullanıcı kaydı
@@ -99,23 +99,23 @@ Server başladıktan sonra:
 - `DELETE /api/books/{id}` - Kitap sil (🔒 Admin)
 
 **User Preferences (9 endpoint):**
-- `GET /api/me/favorites` - Favori kitaplar (🔒)
-- `POST /api/me/favorites/{book_id}` - Favorilere ekle (🔒)
-- `DELETE /api/me/favorites/{book_id}` - Favorilerden çıkar (🔒)
-- `GET /api/me/cart` - Sepet (🔒)
-- `POST /api/me/cart/{book_id}` - Sepete ekle (🔒)
-- `DELETE /api/me/cart/{book_id}` - Sepetten çıkar (🔒)
-- `GET /api/me/interactions` - Etkileşim geçmişi (🔒)
-- `POST /api/me/interactions` - Yeni etkileşim (🔒)
-- `GET /api/me/purchased` - Satın alınan kitaplar (🔒)
+- `GET /api/users/me` - Profil + tercihler (🔒)
+- `PUT /api/users/me/profile` - Profil güncelle (🔒)
+- `GET /api/users/me/preferences` - Tercihler (🔒)
+- `PUT /api/users/me/preferences` - Tercih güncelle (🔒)
+- `GET /api/users/me/favorites` - Favori kitaplar (🔒)
+- `POST /api/users/me/favorites/{book_id}` - Favorilere ekle (🔒)
+- `DELETE /api/users/me/favorites/{book_id}` - Favorilerden çıkar (🔒)
+- `GET /api/users/me/history` - Etkileşim geçmişi (🔒)
+- `POST /api/users/me/interactions` - Yeni etkileşim (🔒)
 
 **Admin Panel (6 endpoint):**
-- `GET /api/admin/users` - Tüm kullanıcılar (🔒 Admin)
-- `GET /api/admin/users/{id}` - Kullanıcı detayı (🔒 Admin)
-- `PUT /api/admin/users/{id}` - Kullanıcı güncelle (🔒 Admin)
-- `DELETE /api/admin/users/{id}` - Kullanıcı sil (🔒 Admin)
-- `GET /api/admin/stats` - İstatistikler (🔒 Admin)
-- `POST /api/admin/seed` - Test data yükle (🔒 Admin)
+- `GET /api/admin/stats` - Dashboard istatistikleri (🔒 Admin)
+- `GET /api/admin/users` - Kullanıcı listesi (🔒 Admin)
+- `GET /api/admin/users/{user_id}` - Kullanıcı detayı (🔒 Admin)
+- `GET /api/admin/orders` - Sipariş listesi (🔒 Admin)
+- `GET /api/admin/orders/{order_id}` - Sipariş detayı (🔒 Admin)
+- `PUT /api/admin/orders/{order_id}/status` - Sipariş durumu güncelle (🔒 Admin)
 
 **Vision API (3 endpoint):**
 - `GET /api/vision/health` - Vision service health check
@@ -131,7 +131,20 @@ Server başladıktan sonra:
 🔍 = Elasticsearch search  
 🤖 = AI-powered
 
-**TOPLAM: 34 API ENDPOINT**
+**Chat (5 endpoint):**
+- `POST /api/chat/message` - Chatbot'a mesaj gönder (🔒) 🤖
+- `GET /api/chat/conversations` - Konuşma listesi (🔒) 🤖
+- `GET /api/chat/conversations/{id}` - Konuşma detayı (🔒) 🤖
+- `DELETE /api/chat/conversations/{id}` - Konuşma sil (🔒) 🤖
+- `POST /api/chat/conversations/{id}/title` - Başlık güncelle (🔒) 🤖
+
+**Social (4 endpoint):**
+- `GET /api/social/find-buddies` - Benzer okuyucular bul (🔒) 👥
+- `GET /api/social/buddies/{buddy_id}/shared-interests` - Ortak ilgiler (🔒) 👥
+- `GET /api/social/buddies/{buddy_id}/recommendations` - Buddy önerileri (🔒) 👥
+- `POST /api/social/connect/{buddy_id}` - Buddy ile bağlan (🔒) 👥
+
+**TOPLAM: 39 API ENDPOINT**
 
 **Search Examples:**
 ```bash
@@ -158,6 +171,8 @@ backend/
 │   │   ├── admin.py      # ✅ Admin Panel (6 endpoints)
 │   │   ├── vision.py     # ✅ Vision API (3 endpoints)
 │   │   ├── recommendations.py # ✅ Recommendations (3 endpoints)
+│   │   ├── chat.py       # ✅ Chat API (5 endpoints)
+│   │   ├── social.py     # ✅ Social Features (4 endpoints)
 │   │   ├── deps.py       # Auth dependencies
 │   │   └── health.py     # Health check
 │   ├── core/             # Core modules
