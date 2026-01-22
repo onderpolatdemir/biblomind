@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_CACHE_ENABLED: bool = True
+    REDIS_CACHE_TTL: int = 300  # 5 minutes default
     
     # Elasticsearch
     ELASTICSEARCH_URL: str = "http://localhost:9200"
@@ -94,9 +98,14 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"
     
     # Feature Flags
-    ENABLE_CHATBOT: bool = False
-    ENABLE_SOCIAL_FEATURES: bool = False
+    ENABLE_CHATBOT: bool = True
+    ENABLE_SOCIAL_FEATURES: bool = True
     ENABLE_ADMIN_PANEL: bool = True
+    
+    # Sentry Monitoring (Optional)
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
     
     model_config = SettingsConfigDict(
         case_sensitive=False,

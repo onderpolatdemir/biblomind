@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -18,6 +18,7 @@ from app.schemas.chat import (
     ConversationTitleUpdate,
     ConversationDeleteResponse
 )
+from app.core.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,9 @@ router = APIRouter()
     - conversation_id: UUID → Continues existing conversation
     """
 )
+@limiter.limit("10/minute")
 async def send_message(
+    http_request: Request,
     request: ChatMessageRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

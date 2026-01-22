@@ -21,6 +21,12 @@ from app.schemas.chat import (
     ConversationListResponse,
     ConversationTitleUpdate,
 )
+from app.schemas.social import (
+    BookBuddyListResponse,
+    SharedInterestsResponse,
+    BuddyRecommendationsResponse,
+    ConnectionResponse,
+)
 
 __all__ = [
     "UserCreate",
@@ -38,4 +44,8 @@ __all__ = [
     "ConversationDetailResponse",
     "ConversationListResponse",
     "ConversationTitleUpdate",
+    "BookBuddyListResponse",
+    "SharedInterestsResponse",
+    "BuddyRecommendationsResponse",
+    "ConnectionResponse",
 ]
