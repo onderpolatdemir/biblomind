@@ -24,19 +24,19 @@ FastAPI backend for BiblioMind - AI-powered book discovery platform.
 
 3. **Seed data ekle (opsiyonel, 20 kitap):**
    ```bash
-   python scripts/seed_books.py
+   python scripts/db/seed_books.py
    ```
 
 ### Otomatik Başlatma (Önerilen)
 
 **Git Bash / Linux / macOS:**
 ```bash
-./scripts/start_server.sh
+./scripts/utils/start_server.sh
 ```
 
 **Windows PowerShell:**
 ```powershell
-.\scripts\start_server.ps1
+.\scripts\utils\start_server.ps1
 ```
 
 ### Manuel Başlatma
@@ -207,15 +207,19 @@ backend/
 │   └── versions/
 │       ├── 4251afb851f4_initial_schema.py
 │       └── b3a2c94e5f12_add_is_admin.py
-├── scripts/              # Utility scripts
-│   ├── start_server.sh   # ✅ Bash server başlatma
-│   ├── start_server.ps1  # ✅ PowerShell server başlatma
-│   ├── create_admin.py   # ✅ Admin kullanıcı oluşturma
-│   ├── seed_books.py     # ✅ 20 kitap seed data
-│   ├── index_books_to_es.py # ✅ Elasticsearch indexing
-│   ├── generate_book_embeddings.py # ✅ Book embeddings (Phase 2.3)
-│   ├── seed_interactions.py # ✅ Test user interactions (Phase 2.3)
-│   └── test_recommendations.py # ✅ Recommendation tests (Phase 2.3)
+├── scripts/              # Utility scripts (kategorize edilmiş)
+│   ├── dev/              # Geliştirme scriptleri
+│   │   ├── test_*.py     # Test scriptleri
+│   │   └── benchmark_*.py # Benchmark scriptleri
+│   ├── db/               # Veritabanı scriptleri
+│   │   ├── seed_books.py # ✅ 20 kitap seed data
+│   │   ├── seed_interactions.py # ✅ Test user interactions
+│   │   └── create_admin.py # ✅ Admin kullanıcı oluşturma
+│   ├── utils/            # Yardımcı scriptler
+│   │   ├── start_server.sh # ✅ Bash server başlatma
+│   │   └── start_server.ps1 # ✅ PowerShell server başlatma
+│   └── dangerous/        # ⚠️ Tehlikeli scriptler
+│       └── clear_books.py # Veritabanını temizleme
 ├── docs/                 # Backend dokümantasyonu
 │   ├── QUICKSTART.md
 │   ├── SERVER_COMMANDS.md
@@ -275,7 +279,7 @@ backend/
 
 6. **Seed data ekle (opsiyonel):**
    ```bash
-   python scripts/seed_books.py
+   python scripts/db/seed_books.py
    ```
    → 20 kitap eklenir (1984, Pride and Prejudice, vb.)
 

@@ -78,9 +78,9 @@ docker-compose up -d
 
 # 2. Backend'e git ve server'ı başlat
 cd backend
-./scripts/start_server.sh          # Git Bash / Linux / macOS
+./scripts/utils/start_server.sh          # Git Bash / Linux / macOS
 # veya
-.\scripts\start_server.ps1          # Windows PowerShell
+.\scripts\utils\start_server.ps1          # Windows PowerShell
 
 # 3. Tarayıcıda aç
 # http://localhost:8000/docs
@@ -234,10 +234,10 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 - [ ] Sepet/Order UI tasarımı
 
 ### 🔄 Faz 2: AI Entegrasyonu (Hafta 5-8)
-- [ ] Google Cloud Vision API
-- [ ] Kitap veri seti import
-- [ ] OpenAI embedding oluşturma
-- [ ] RAG pipeline kurulumu
+- [x] Google Cloud Vision API
+- [x] Kitap veri seti import
+- [x] OpenAI embedding oluşturma
+- [x] RAG pipeline kurulumu
 
 ### 📋 Faz 3: E-ticaret & UX (Hafta 9-12)
 - [ ] Sepet ve sipariş sistemi
@@ -245,9 +245,6 @@ docker exec -it bibliomind-backend alembic upgrade head### 5. Uygulamayı açın
 - [ ] Responsive UI
 - [ ] Optimizasyonlar (Redis, Celery)
 
-## 🎨 Ekran Görüntüleri
-
-_Geliştirme aşamasında eklenecek_
 
 ## 📊 Sistem Mimarisi
 
@@ -260,9 +257,9 @@ graph TB
     FastAPI --> GoogleVision[Google Cloud Vision]## 🤝 Katkıda Bulunma
 
 1. Fork edin
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
+2. Feature branch oluşturun (`git checkout -b your-name/feature/amazing-feature`)
 3. Commit edin (`git commit -m 'Add amazing feature'`)
-4. Push edin (`git push origin feature/amazing-feature`)
+4. Push edin (`git push origin your-name/feature/amazing-feature`)
 5. Pull Request açın
 
 ## 📝 Lisans
