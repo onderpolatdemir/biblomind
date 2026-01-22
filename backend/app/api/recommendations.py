@@ -47,7 +47,7 @@ async def get_recommendations(
     ),
     strategy: str = Query(
         default="hybrid",
-        regex="^(hybrid|content|popular)$",
+        pattern="^(hybrid|content|popular)$",
         description="Recommendation strategy"
     ),
     exclude_owned: bool = Query(
