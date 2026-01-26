@@ -6,6 +6,8 @@ from app.models.user_interaction import UserInteraction
 from app.models.photo_scan import PhotoScan
 from app.models.cart import Cart, CartItem
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.conversation import Conversation, ConversationMessage
+from app.models.user_connection import UserConnection
 
 __all__ = [
     "User",
@@ -17,4 +19,7 @@ __all__ = [
     "Order",
     "OrderItem",
     "OrderStatus",
+    "Conversation",
+    "ConversationMessage",
+    "UserConnection",
 ]

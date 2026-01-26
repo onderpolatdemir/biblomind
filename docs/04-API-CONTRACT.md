@@ -125,13 +125,16 @@ Kullanıcı girişi
 ### GET /api/auth/me
 Mevcut kullanıcı bilgisi (🔒 Requires Auth)
 
+**Note:** Bu endpoint artık sadece temel bilgileri döner. 
+Tercihler dahil detaylı bilgi için `GET /api/users/me` kullanın.
+
 **Response (200):**
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "email": "user@example.com",
   "full_name": "John Doe",
-  "preferences_vector": [0.123, 0.456, ...], // 1536 dimensions
+  "is_admin": false,
   "created_at": "2026-01-13T10:00:00Z"
 }
 ```
@@ -399,6 +402,187 @@ Benim için öneriler (kullanıcı geçmişine göre) (🔒 Requires Auth)
   ]
 }
 ```
+
+---
+
+## 👤 User Endpoints (NEW - Phase 1 ✅)
+
+### GET /api/users/me
+Kullanıcı profili ve tercihleri (🔒 Requires Auth)
+
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "full_name": "John Doe",
+  "is_admin": false,
+  "created_at": "2026-01-13T10:00:00Z",
+  "preferences": {
+    "favorite_genres": ["Science Fiction", "Mystery"],
+    "favorite_authors": ["Agatha Christie", "Isaac Asimov"]
+  }
+}
+```
+
+---
+
+### PUT /api/users/me/profile
+Profil güncelleme (🔒 Requires Auth)
+
+**Request:**
+```json
+{
+  "full_name": "John Smith"
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "full_name": "John Smith",
+  "is_admin": false,
+  "created_at": "2026-01-13T10:00:00Z"
+}
+```
+
+---
+
+### GET /api/users/me/preferences
+Kullanıcı tercihleri (🔒 Requires Auth)
+
+**Response (200):**
+```json
+{
+  "favorite_genres": ["Science Fiction", "Mystery", "Dystopian"],
+  "favorite_authors": ["George Orwell", "Agatha Christie", "Isaac Asimov"]
+}
+```
+
+**Note:** Tercihler, kullanıcının favori kitaplarından otomatik olarak türetilir.
+
+---
+
+### PUT /api/users/me/preferences
+Tercih güncelleme (🔒 Requires Auth)
+
+**Request:**
+```json
+{
+  "favorite_genres": ["Horror", "Thriller"],
+  "favorite_authors": ["Stephen King"]
+}
+```
+
+**Response (200):**
+```json
+{
+  "favorite_genres": ["Horror", "Thriller"],
+  "favorite_authors": ["Stephen King"]
+}
+```
+
+**Note:** Phase 2'de AI ile preferences_vector güncellenecek.
+
+---
+
+### GET /api/users/me/favorites
+Favori kitaplar (🔒 Requires Auth)
+
+**Response (200):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "title": "1984",
+    "author": "George Orwell",
+    "description": "...",
+    "isbn": "9780451524935",
+    "price": 45.00,
+    "stock": 15,
+    "cover_url": "https://covers.example.com/1984.jpg",
+    "genres": ["Dystopian", "Science Fiction"],
+    "created_at": "2026-01-10T08:00:00Z"
+  }
+]
+```
+
+---
+
+### POST /api/users/me/favorites/{book_id}
+Favoriye ekle (🔒 Requires Auth)
+
+**Response (201):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "title": "1984",
+  "author": "George Orwell",
+  "price": 45.00,
+  ...
+}
+```
+
+---
+
+### DELETE /api/users/me/favorites/{book_id}
+Favoriden kaldır (🔒 Requires Auth)
+
+**Response (204):** No Content
+
+---
+
+### GET /api/users/me/history
+Etkileşim geçmişi (🔒 Requires Auth)
+
+**Query Parameters:**
+- `interaction_type` (optional): view, like, cart, purchase
+- `limit` (optional, default: 50, max: 100)
+
+**Response (200):**
+```json
+[
+  {
+    "id": "interaction-uuid",
+    "user_id": "user-uuid",
+    "book_id": "book-uuid",
+    "interaction_type": "view",
+    "created_at": "2026-01-20T10:00:00Z"
+  }
+]
+```
+
+---
+
+### POST /api/users/me/interactions
+Etkileşim kaydet (🔒 Requires Auth)
+
+**Request:**
+```json
+{
+  "book_id": "550e8400-e29b-41d4-a716-446655440001",
+  "interaction_type": "view"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "interaction-uuid",
+  "user_id": "user-uuid",
+  "book_id": "book-uuid",
+  "interaction_type": "view",
+  "created_at": "2026-01-20T10:00:00Z"
+}
+```
+
+**Valid interaction types:**
+- `view` - Kitap detayı görüntülendi
+- `like` - Kitap beğenildi (favoriye ekleme için `POST /favorites/{book_id}` kullanın)
+- `cart` - Sepete eklendi
+- `purchase` - Satın alındı
 
 ---
 
@@ -876,7 +1060,7 @@ Ortak ilgi alanları (🔒 Requires Auth)
 
 ---
 
-## 👤 Admin Endpoints
+## 👤 Admin Endpoints (UPDATED - Phase 1 ✅)
 
 ### GET /api/admin/stats
 Dashboard istatistikleri (🔒 Requires Admin)
@@ -888,94 +1072,189 @@ Dashboard istatistikleri (🔒 Requires Admin)
   "total_books": 10234,
   "total_orders": 456,
   "total_revenue": 45678.90,
-  "recent_orders": [...],
-  "top_selling_books": [...],
   "orders_by_status": {
     "PENDING": 12,
     "PAID": 34,
     "SHIPPED": 28,
-    "DELIVERED": 382
+    "DELIVERED": 382,
+    "CANCELLED": 5
   }
 }
 ```
 
+**Note:** Total revenue sadece PAID, SHIPPED ve DELIVERED siparişlerden hesaplanır.
+
 ---
 
-### GET /api/admin/books
-Kitap listesi (admin) (🔒 Requires Admin)
+### GET /api/admin/users
+Kullanıcı listesi (🔒 Requires Admin)
 
 **Query Parameters:**
-- `page`, `page_size`, filters...
+- `page` (int, default: 1)
+- `page_size` (int, default: 20, max: 100)
+- `search` (string, optional) - Email veya isim araması
 
 **Response (200):**
 ```json
 {
-  "items": [...],
-  "total": 10234
+  "items": [
+    {
+      "id": "user-uuid",
+      "email": "user@example.com",
+      "full_name": "John Doe",
+      "is_admin": false,
+      "created_at": "2026-01-10T10:00:00Z",
+      "total_orders": 5,
+      "total_spent": 450.00
+    }
+  ],
+  "total": 1523,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 77
 }
 ```
 
 ---
 
-### POST /api/admin/books
-Yeni kitap ekle (🔒 Requires Admin)
+### GET /api/admin/users/{user_id}
+Kullanıcı detayı (🔒 Requires Admin)
+
+**Response (200):**
+```json
+{
+  "id": "user-uuid",
+  "email": "user@example.com",
+  "full_name": "John Doe",
+  "is_admin": false,
+  "created_at": "2026-01-10T10:00:00Z",
+  "total_orders": 5,
+  "total_spent": 450.00
+}
+```
+
+---
+
+### GET /api/admin/orders
+Sipariş listesi (🔒 Requires Admin)
+
+**Query Parameters:**
+- `page` (int, default: 1)
+- `page_size` (int, default: 20, max: 100)
+- `status` (string, optional) - PENDING, PAID, SHIPPED, DELIVERED, CANCELLED
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": "order-uuid",
+      "user_id": "user-uuid",
+      "user_email": "user@example.com",
+      "status": "SHIPPED",
+      "total_price": 145.00,
+      "shipping_address": {...},
+      "notes": "...",
+      "created_at": "2026-01-15T10:00:00Z",
+      "updated_at": "2026-01-16T09:00:00Z",
+      "items_count": 3
+    }
+  ],
+  "total": 456,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 23
+}
+```
+
+---
+
+### GET /api/admin/orders/{order_id}
+Sipariş detayı (🔒 Requires Admin)
+
+**Response (200):**
+```json
+{
+  "id": "order-uuid",
+  "user_id": "user-uuid",
+  "user_email": "user@example.com",
+  "status": "SHIPPED",
+  "total_price": 145.00,
+  "shipping_address": {
+    "full_name": "John Doe",
+    "address_line1": "123 Main St",
+    "city": "Istanbul",
+    "postal_code": "34000",
+    "phone": "+90 555 123 4567"
+  },
+  "notes": "Please deliver in the morning",
+  "created_at": "2026-01-15T10:00:00Z",
+  "updated_at": "2026-01-16T09:00:00Z",
+  "items_count": 3,
+  "items": [
+    {
+      "id": "item-uuid",
+      "book_id": "book-uuid",
+      "book_title": "1984",
+      "book_author": "George Orwell",
+      "quantity": 2,
+      "price": 45.00
+    }
+  ]
+}
+```
+
+---
+
+### PUT /api/admin/orders/{order_id}/status
+Sipariş durumu güncelleme (🔒 Requires Admin)
 
 **Request:**
 ```json
 {
-  "title": "New Book",
-  "author": "Author Name",
-  "isbn": "...",
-  "description": "...",
-  "price": 50.00,
-  "stock": 20,
-  "cover_url": "...",
-  "genres": ["Fiction"]
+  "status": "SHIPPED"
 }
 ```
 
-**Response (201):**
+**Valid statuses:**
+- `PENDING` - Ödeme bekleniyor
+- `PAID` - Ödeme alındı
+- `SHIPPED` - Kargoya verildi
+- `DELIVERED` - Teslim edildi
+- `CANCELLED` - İptal edildi
+
+**Response (200):**
 ```json
 {
-  "book": {
-    "id": "...",
-    "title": "New Book",
-    ...
-  }
+  "id": "order-uuid",
+  "user_id": "user-uuid",
+  "user_email": "user@example.com",
+  "status": "SHIPPED",
+  "total_price": 145.00,
+  ...
+}
+```
+
+**Errors:**
+```json
+// Invalid status
+{
+  "detail": "Invalid status. Must be one of: PENDING, PAID, SHIPPED, DELIVERED, CANCELLED",
+  "status_code": 400
 }
 ```
 
 ---
 
-### PUT /api/admin/books/{id}
-Kitap güncelle (🔒 Requires Admin)
+### Admin Books Endpoints
 
-**Request:**
-```json
-{
-  "price": 55.00,
-  "stock": 25
-}
-```
+**Note:** Admin kitap yönetimi endpoint'leri `/api/books` altında bulunur (admin-only):
 
-**Response (200):**
-```json
-{
-  "book": {...}
-}
-```
+- `POST /api/books` - Yeni kitap ekle (🔒 Admin)
+- `PUT /api/books/{id}` - Kitap güncelle (🔒 Admin)
+- `DELETE /api/books/{id}` - Kitap sil (🔒 Admin)
 
----
-
-### DELETE /api/admin/books/{id}
-Kitap sil (🔒 Requires Admin)
-
-**Response (200):**
-```json
-{
-  "message": "Book deleted successfully"
-}
-```
+Detaylar için Books Endpoints bölümüne bakın.
 
 ---
 

@@ -10,6 +10,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.middleware import logging_middleware, global_exception_handler
+from app.core.rate_limit import init_rate_limiting
+from app.core.monitoring import init_sentry
 from app.api import api_router
 
 
@@ -20,6 +22,8 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger = setup_logging()
+    init_sentry()  # Initialize Sentry error tracking
+    
     logger.info("=" * 60)
     logger.info(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
@@ -80,6 +84,9 @@ if not settings.DEBUG:
 
 # Custom Middleware
 app.middleware("http")(logging_middleware)
+
+# Rate Limiting
+init_rate_limiting(app)
 
 # Exception Handlers
 app.add_exception_handler(Exception, global_exception_handler)

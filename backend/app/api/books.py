@@ -1,41 +1,206 @@
-from typing import Any, List
-from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+"""Books API endpoints."""
 
-from app.core.database import get_db
-from app.models.book import Book as BookModel
-from app.schemas.book import Book
+import math
+from typing import Optional
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db, get_current_admin_user
+from app.services.book_service import BookService
+from app.services.elasticsearch_service import es_service
+from app.schemas.book import BookCreate, BookUpdate, BookResponse, BookListResponse, BookSearchResponse
+
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Book])
-def read_books(
-    db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100
-) -> Any:
-    """
-    Retrieve books.
-    """
-    query = select(BookModel).offset(skip).limit(limit)
-    books = db.execute(query).scalars().all()
-    return books
 
-@router.get("/{book_id}", response_model=Book)
-def read_book(
+@router.get("", response_model=BookListResponse)
+async def get_books(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Number of items per page"),
+    genre: Optional[str] = Query(None, description="Filter by genre"),
+    author: Optional[str] = Query(None, description="Filter by author (partial match)"),
+    min_price: Optional[float] = Query(None, ge=0, description="Minimum price"),
+    max_price: Optional[float] = Query(None, ge=0, description="Maximum price"),
+    sort_by: str = Query("created_at", pattern="^(title|author|price|created_at)$", description="Sort field"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get paginated list of books (public endpoint).
+    
+    Supports:
+    - Pagination (page, page_size)
+    - Filtering (genre, author, price range)
+    - Sorting (title, author, price, created_at)
+    """
+    books, total = BookService.get_books(
+        db=db,
+        page=page,
+        page_size=page_size,
+        genre=genre,
+        author=author,
+        min_price=min_price,
+        max_price=max_price,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
+    
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    
+    return BookListResponse(
+        items=[BookResponse.model_validate(book) for book in books],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/search", response_model=BookSearchResponse)
+async def search_books(
+    q: str = Query(..., min_length=1, description="Search query"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Number of items per page"),
+    genre: Optional[str] = Query(None, description="Filter by genre"),
+    author: Optional[str] = Query(None, description="Filter by author"),
+    min_price: Optional[float] = Query(None, ge=0, description="Minimum price"),
+    max_price: Optional[float] = Query(None, ge=0, description="Maximum price")
+):
+    """
+    Search books with Elasticsearch (public endpoint).
+    
+    Features:
+    - Full-text search across title, author, description
+    - Fuzzy matching (typo tolerance)
+    - Relevance scoring
+    - Combine with filters (genre, author, price range)
+    
+    Examples:
+    - /api/books/search?q=1984
+    - /api/books/search?q=Orwel (finds "Orwell")
+    - /api/books/search?q=dystopian&genre=Science Fiction
+    """
+    # Check Elasticsearch connection
+    if not es_service.ping():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Search service temporarily unavailable"
+        )
+    
+    # Perform search
+    results = es_service.search_books(
+        query=q,
+        page=page,
+        page_size=page_size,
+        genre=genre,
+        author=author,
+        min_price=min_price,
+        max_price=max_price
+    )
+    
+    total = results["total"]
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    
+    return BookSearchResponse(
+        items=results["hits"],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+@router.get("/{book_id}", response_model=BookResponse)
+async def get_book(
     book_id: UUID,
     db: Session = Depends(get_db)
-) -> Any:
+):
     """
-    Get book by ID.
+    Get a single book by ID (public endpoint).
     """
-    query = select(BookModel).where(BookModel.id == book_id)
-    book = db.execute(query).scalars().first()
+    book = BookService.get_book_by_id(db, book_id)
+    
     if not book:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Book not found"
         )
-    return book
+    
+    return BookResponse.model_validate(book)
+
+
+@router.post("", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
+async def create_book(
+    book_data: BookCreate,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin_user)
+):
+    """
+    Create a new book (admin only).
+    
+    Requires admin authentication.
+    """
+    # Check if ISBN already exists
+    if book_data.isbn and BookService.check_isbn_exists(db, book_data.isbn):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Book with this ISBN already exists"
+        )
+    
+    book = BookService.create_book(db, book_data)
+    
+    return BookResponse.model_validate(book)
+
+
+@router.put("/{book_id}", response_model=BookResponse)
+async def update_book(
+    book_id: UUID,
+    book_data: BookUpdate,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin_user)
+):
+    """
+    Update a book (admin only).
+    
+    Requires admin authentication.
+    """
+    # Check if ISBN is being updated and already exists
+    if book_data.isbn and BookService.check_isbn_exists(db, book_data.isbn, exclude_id=book_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Book with this ISBN already exists"
+        )
+    
+    book = BookService.update_book(db, book_id, book_data)
+    
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found"
+        )
+    
+    return BookResponse.model_validate(book)
+
+
+@router.delete("/{book_id}", status_code=status.HTTP_200_OK)
+async def delete_book(
+    book_id: UUID,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin_user)
+):
+    """
+    Delete a book (admin only).
+    
+    Requires admin authentication.
+    """
+    success = BookService.delete_book(db, book_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found"
+        )
+    
+    return {"message": "Book deleted successfully"}

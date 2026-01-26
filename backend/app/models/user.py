@@ -1,6 +1,6 @@
 """User model with vector-based preference system."""
 
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -28,6 +28,9 @@ class User(Base):
     # AI preference vector (1536 dimensions for OpenAI embeddings)
     preferences_vector = Column(Vector(1536), nullable=True)
     
+    # Admin flag
+    is_admin = Column(Boolean, default=False, nullable=False)
+    
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
@@ -36,6 +39,8 @@ class User(Base):
     photo_scans = relationship("PhotoScan", back_populates="user", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="user", cascade="all, delete-orphan")
     cart = relationship("Cart", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    connections = relationship("UserConnection", foreign_keys="[UserConnection.user_id]", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
