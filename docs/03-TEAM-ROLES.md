@@ -725,19 +725,19 @@ DELETE /api/books/{id} ✅ (admin only)
 **Durum:** ⏳ Bekliyor
 
 **Görevler:**
-- [ ] `backend/app/models/cart.py`:
+- [x] `backend/app/models/cart.py`:
   - `Cart` model (user_id, created_at, updated_at)
   - `CartItem` model (cart_id, book_id, quantity)
-- [ ] `backend/app/api/cart.py`:
+- [x] `backend/app/api/cart.py`:
   - `POST /api/cart/add` (book_id, quantity)
   - `GET /api/cart` (user'ın sepeti)
   - `PUT /api/cart/item/{id}` (quantity update)
   - `DELETE /api/cart/item/{id}` (remove item)
   - `POST /api/cart/clear` (empty cart)
 - [ ] Redis session management (optional)
-- [ ] Total price calculation
-- [ ] Stock validation
-- [ ] Unit tests
+- [x] Total price calculation
+- [x] Stock validation
+- [x] Unit tests
 
 **Çıktı:** Cart API hazır  
 **Entegrasyon:** ✅ Barış cart UI yapabilir
@@ -756,23 +756,23 @@ Response: { "cart": {...}, "total_items": 3, "total_price": 150.50 }
 **Durum:** ⏳ Bekliyor
 
 **Görevler:**
-- [ ] `backend/app/models/order.py`:
+- [x] `backend/app/models/order.py`:
   - `Order` model (user_id, total_price, status, shipping_address)
   - `OrderItem` model (order_id, book_id, quantity, price)
   - Order status enum: PENDING, PAID, SHIPPED, DELIVERED, CANCELLED
-- [ ] `backend/app/api/orders.py`:
+- [x] `backend/app/api/orders.py`:
   - `POST /api/orders/create` (cart → order)
   - `GET /api/orders` (user'ın siparişleri)
   - `GET /api/orders/{id}` (order detail)
   - `PUT /api/orders/{id}/status` (admin için)
-- [ ] Order workflow:
+- [x] Order workflow:
   1. Cart → Order (sepeti dondur)
   2. Payment → Status update
   3. Shipping → Email notification
 - [ ] Email service (basic SMTP):
   - Order confirmation
   - Shipping notification
-- [ ] Unit tests
+- [x] Unit tests
 
 **Çıktı:** Order API hazır
 
@@ -783,18 +783,18 @@ Response: { "cart": {...}, "total_items": 3, "total_price": 150.50 }
 **Durum:** ⏳ Bekliyor
 
 **Görevler:**
-- [ ] İyzico API research
-- [ ] `backend/app/services/payment_service.py`:
+- [x] İyzico API research
+- [x] `backend/app/services/payment_service.py`:
   - `initialize_payment(order_id) -> payment_url`
   - `verify_payment(callback_data) -> success`
   - Sandbox/test mode
-- [ ] `backend/app/api/payment.py`:
+- [x] `backend/app/api/payment.py`:
   - `POST /api/payment/initialize` → payment iframe URL
   - `POST /api/payment/callback` (İyzico webhook)
   - `GET /api/payment/status/{order_id}`
-- [ ] Order status update after payment
-- [ ] Transaction logging
-- [ ] Test payment flow
+- [x] Order status update after payment
+- [x] Transaction logging
+- [x] Test payment flow
 
 **Çıktı:** Payment integration hazır (test mode)
 
