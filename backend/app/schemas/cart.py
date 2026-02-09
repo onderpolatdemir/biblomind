@@ -10,6 +10,7 @@ class BookSummary(BaseModel):
     title: str
     author: Optional[str] = None
     price: Decimal
+    stock: int  # Added for cart validation
     cover_url: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)

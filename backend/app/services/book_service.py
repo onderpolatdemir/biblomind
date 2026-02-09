@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from uuid import UUID
 import math
 import logging
@@ -23,6 +23,7 @@ class BookService:
         page_size: int = 20,
         genre: Optional[str] = None,
         author: Optional[str] = None,
+        title: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
         sort_by: str = "created_at",
@@ -52,10 +53,15 @@ class BookService:
         filters = []
         
         if genre:
-            filters.append(Book.genres.contains([genre]))
+            # Case-insensitive partial match on the genres array converted to string
+            # This allows "sci-fi" to match "Sci-Fi" and handle generic casing
+            filters.append(func.array_to_string(Book.genres, ",").ilike(f"%{genre}%"))
         
         if author:
             filters.append(Book.author.ilike(f"%{author}%"))
+
+        if title:
+            filters.append(Book.title.ilike(f"%{title}%"))
         
         if min_price is not None:
             filters.append(Book.price >= min_price)

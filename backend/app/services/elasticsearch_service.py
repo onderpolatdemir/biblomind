@@ -121,7 +121,8 @@ class ElasticsearchService:
                 "isbn": book.isbn,
                 "stock": book.stock,
                 "cover_url": book.cover_url,
-                "created_at": book.created_at.isoformat() if book.created_at else None
+                "created_at": book.created_at.isoformat() if book.created_at else None,
+                "publication_year": book.publication_year
             }
             
             self.client.index(
@@ -220,7 +221,8 @@ class ElasticsearchService:
                 "isbn": book.isbn,
                 "stock": book.stock,
                 "cover_url": book.cover_url,
-                "created_at": book.created_at.isoformat() if book.created_at else None
+                "created_at": book.created_at.isoformat() if book.created_at else None,
+                "publication_year": book.publication_year
             }
             
             self.client.update(
