@@ -17,9 +17,9 @@ echo -e "${BLUE}║   🚀 BiblioMind Server Başlatılıyor   ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo ""
 
-# Backend dizinine git (scriptin bir üst dizini)
+# Backend dizinine git (scriptin iki üst dizini)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/../.."
 
 # Docker servislerini kontrol et
 echo -e "${YELLOW}→ Docker servislerini kontrol ediliyor...${NC}"
