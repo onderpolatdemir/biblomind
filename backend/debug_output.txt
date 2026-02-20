@@ -1,0 +1,15 @@
+Testing Iyzico Connection...
+
+Scanning URL: https://sandbox-api.iyzipay.com
+Exception: nonnumeric port: '//sandbox-api.iyzipay.com'
+
+Scanning URL: https://sandbox-api.iyzipay.com/
+Exception: nonnumeric port: '//sandbox-api.iyzipay.com/'
+
+Scanning URL: sandbox-api.iyzipay.com
+Result Type: <class 'http.client.HTTPResponse'>
+AttributeError: object has no get_status()
+Raw Object: <http.client.HTTPResponse object at 0x0000015648DD5450>
+
+Scanning URL: http://sandbox-api.iyzipay.com
+Exception: nonnumeric port: '//sandbox-api.iyzipay.com'

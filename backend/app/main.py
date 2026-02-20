@@ -24,6 +24,11 @@ async def lifespan(app: FastAPI):
     logger = setup_logging()
     init_sentry()  # Initialize Sentry error tracking
     
+    # Create database tables
+    from app.core.database import Base, engine
+    import app.models # Import models to ensure they are registered
+    Base.metadata.create_all(bind=engine)
+    
     logger.info("=" * 60)
     logger.info(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")

@@ -13,6 +13,26 @@ from app.schemas import cart as schemas
 
 router = APIRouter()
 
+# Helper function
+def _delete_pending_order_if_cart_empty(user_id: UUID, db: Session):
+    # 1. Check if cart is empty
+    cart_query = select(Cart).where(Cart.user_id == user_id).options(joinedload(Cart.items))
+    cart = db.execute(cart_query).scalars().first()
+    
+    if not cart or not cart.items:
+        # Cart is empty, delete any pending order
+        from app.models.order import Order, OrderStatus # Local import to avoid circular dependency if any
+        
+        pending_order_query = select(Order).where(
+            Order.user_id == user_id,
+            Order.status == OrderStatus.PENDING
+        )
+        pending_order = db.execute(pending_order_query).scalars().first()
+        
+        if pending_order:
+            db.delete(pending_order)
+            db.commit()
+
 @router.get("/", response_model=schemas.Cart)
 def get_cart(
     current_user: User = Depends(deps.get_current_user),
@@ -150,6 +170,9 @@ def remove_from_cart(
         
     db.delete(item)
     db.commit()
+    
+    # Check if cart is empty and delete pending order
+    _delete_pending_order_if_cart_empty(current_user.id, db)
     
     # Return updated cart
     cart_query = select(Cart).where(Cart.user_id == current_user.id).options(
