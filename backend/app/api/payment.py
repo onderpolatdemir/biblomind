@@ -1,8 +1,11 @@
 from typing import Any
 from uuid import UUID
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session, joinedload
+
 from sqlalchemy import select
 
 from app.api import deps
@@ -27,7 +30,7 @@ def initialize_payment(
     query = select(Order).where(
         Order.id == request.order_id,
         Order.user_id == current_user.id
-    )
+    ).options(joinedload(Order.items))
     order = db.execute(query).scalars().first()
     
     if not order:
@@ -44,11 +47,37 @@ def initialize_payment(
         
     # 2. Call Payment Service
     try:
+        # Prepare items list
+        items = []
+        for item in order.items:
+            items.append({
+                "id": str(item.book_id),
+                "name": item.book_title,
+                "price": float(item.subtotal)
+            })
+            
+        # Parse user name
+        first_name = "Guest"
+        last_name = "User"
+        if current_user.full_name:
+            parts = current_user.full_name.split(" ")
+            if len(parts) > 0:
+                first_name = parts[0]
+            if len(parts) > 1:
+                last_name = " ".join(parts[1:])
+                
         payment_url = payment_service.initialize_payment(
             order_id=order.id,
             price=float(order.total_price),
-            user_info={"id": str(current_user.id), "email": current_user.email},
-            shipping_address=order.shipping_address or {}
+            user_info={
+                "id": str(current_user.id), 
+                "email": current_user.email,
+                "first_name": first_name,
+                "last_name": last_name,
+                "phone": "+905000000000" # Default for now as User model doesn't have phone
+            },
+            shipping_address=order.shipping_address or {},
+            items=items
         )
     except Exception as e:
         raise HTTPException(
@@ -62,67 +91,85 @@ def initialize_payment(
     }
 
 @router.post("/callback")
-def payment_callback(
-    request: schemas.PaymentCallbackRequest,
+async def payment_callback(
+    request: Request,
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
-    Callback endpoint for successful payment.
-    In a real scenario, this is called by the frontend after Iyzico redirect,
-    or directly by Iyzico webhook.
+    Handle Iyzico payment callback.
     """
-    # 1. Verify payment with service
-    verification_result = payment_service.verify_payment(request.token)
-    
-    if verification_result.get("status") != "success":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=verification_result.get("errorMessage", "Payment verification failed")
-        )
+    try:
+        # Iyzico sends data as form-urlencoded
+        form_data = await request.form()
+        token = form_data.get("token")
         
-    # 2. Update Order Status
-    # In a real app we might need to parse conversationId from token or result
-    # For now, we assume frontend passes the correct context or we find it via payment ID logic
-    # Since this is a mock callback from frontend, we might not have order_id here easily 
-    # unless we encoded it in the "token" or use a different flow.
-    # To keep it simple for this mock: we won't auto-update order status here WITHOUT order_id.
-    # Better flow: Frontend calls this with order_id AND token.
-    # Let's simple return success and let frontend call a 'verify' endpoint with order_id
-    
-    return {"status": "success", "detail": "Payment verified"}
+        if not token:
+             return RedirectResponse(
+                url=f"http://localhost:3000/checkout/result?status=failure&errorMessage=No token provided",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
 
-@router.post("/verify/{order_id}", response_model=schemas.PaymentStatusResponse)
-def verify_payment_status(
-    order_id: UUID,
-    request: schemas.PaymentCallbackRequest,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-) -> Any:
-    """
-    Verify payment status for a specific order and update it.
-    This is called by frontend after returning from Iyzico.
-    """
-    order_query = select(Order).where(
-        Order.id == order_id,
-        Order.user_id == current_user.id
-    )
-    order = db.execute(order_query).scalars().first()
-    
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-        
-    # Verify
-    result = payment_service.verify_payment(request.token)
-    
-    if result.get("status") == "success":
-        if order.status == OrderStatus.PENDING:
-            order.status = OrderStatus.PAID
-            db.add(order)
-            db.commit()
-            db.refresh(order)
-    
-    return {
-        "status": result.get("status"),
-        "payment_id": result.get("paymentId"),
-        "error_message": result.get("errorMessage")
-    }
+        # Verify payment with Iyzico
+        # Re-instantiate service to ensure clean state if needed
+        # payment_service is imported as instance, so we use it directly
+        result = payment_service.verify_payment(token)
+
+        if result.get("status") == "success":
+            # Update order status
+            # Iyzico returns basketId which we set to order_id
+            order_id = result.get("basketId")
+            
+            # Need to find the order. 
+            # Note: We don't have current_user here, so we just find by ID.
+            query = select(Order).where(Order.id == order_id)
+            order = db.execute(query).scalars().first()
+            
+            if order:
+                # Only update if not already paid to avoid redundant history
+                if order.status != OrderStatus.PAID:
+                    order.status = OrderStatus.PAID
+                    
+                    # Update history
+                    if order.status_history is None:
+                        order.status_history = []
+                    
+                    new_history = list(order.status_history)
+                    new_history.append({
+                        "status": OrderStatus.PAID.value,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "updated_by": "Iyzico Callback"
+                    })
+                    order.status_history = new_history
+                    
+                    db.add(order)
+                    
+                    # --- NEW: Clear Cart after successful payment ---
+                    # Find user's cart
+                    from app.models.cart import Cart
+                    cart_query = select(Cart).where(Cart.user_id == order.user_id).options(joinedload(Cart.items))
+                    cart = db.execute(cart_query).scalars().first()
+                    
+                    if cart and cart.items:
+                        for item in cart.items:
+                            db.delete(item)
+                    # -----------------------------------------------
+                    
+                    db.commit()
+            
+            return RedirectResponse(
+                url=f"http://localhost:3000/checkout/result?status=success&orderId={order_id}",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+        else:
+             error_message = result.get("errorMessage", "Payment failed")
+             return RedirectResponse(
+                url=f"http://localhost:3000/checkout/result?status=failure&errorMessage={error_message}",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+            
+    except Exception as e:
+        print(f"Payment Callback Error: {e}")
+        return RedirectResponse(
+            url=f"http://localhost:3000/checkout/result?status=failure&errorMessage=Internal Server Error",
+            status_code=status.HTTP_303_SEE_OTHER
+        )

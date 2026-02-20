@@ -35,6 +35,7 @@ class CartItem(CartItemBase):
     book: Optional[BookSummary] = None  # Nested book details
     
     # Computed property for total price of this item
+    @computed_field
     @property
     def subtotal(self) -> Decimal:
         price = self.price_at_addition

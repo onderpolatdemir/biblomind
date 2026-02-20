@@ -38,6 +38,19 @@ def create_order(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cart is empty"
         )
+
+    # 1.5. Check for existing PENDING order and delete it to prevent duplicates
+    existing_order_query = select(Order).where(
+        Order.user_id == current_user.id,
+        Order.status == OrderStatus.PENDING
+    )
+    existing_order = db.execute(existing_order_query).scalars().first()
+    
+    if existing_order:
+        # Delete existing pending order
+        # Assuming cascade delete is set up for items, otherwise verify
+        db.delete(existing_order)
+        db.flush()
         
     # 2. Calculate totals
     subtotal = sum(item.book.price * item.quantity for item in cart.items if item.book.price)
@@ -77,10 +90,10 @@ def create_order(
         )
         db.add(order_item)
         
-    # 5. Clear Cart
-    # We delete the items but keep the cart record
-    for item in cart.items:
-        db.delete(item)
+    # 5. Clear Cart (MOVED TO PAYMENT CALLBACK)
+    # We keep the items in cart until payment is confirmed
+    # for item in cart.items:
+    #     db.delete(item)
         
     db.commit()
     db.refresh(new_order)
