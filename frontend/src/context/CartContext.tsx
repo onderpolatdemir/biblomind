@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 
 // Types matching backend schemas
@@ -44,7 +44,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const [cart, setCart] = useState<Cart | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const fetchCart = async () => {
+    const fetchCart = useCallback(async () => {
         if (!user) {
             setCart(null);
             return;
@@ -64,13 +64,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to fetch cart", error);
         }
-    };
+    }, [user]);
 
     useEffect(() => {
         fetchCart();
-    }, [user]);
+    }, [fetchCart]);
 
-    const addToCart = async (bookId: string, quantity: number = 1) => {
+    const addToCart = useCallback(async (bookId: string, quantity: number = 1) => {
         const token = localStorage.getItem("token");
         if (!token) {
             // Usually redirect to login or show error
@@ -95,9 +95,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to add to cart", error);
         }
-    };
+    }, []);
 
-    const removeFromCart = async (itemId: string) => {
+    const removeFromCart = useCallback(async (itemId: string) => {
         const token = localStorage.getItem("token");
         if (!token) return;
 
@@ -114,9 +114,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to remove item", error);
         }
-    };
+    }, []);
 
-    const updateQuantity = async (itemId: string, quantity: number) => {
+    const updateQuantity = useCallback(async (itemId: string, quantity: number) => {
         const token = localStorage.getItem("token");
         if (!token) return;
 
@@ -137,9 +137,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to update quantity", error);
         }
-    };
+    }, []);
 
-    const clearCart = async () => {
+    const clearCart = useCallback(async () => {
         const token = localStorage.getItem("token");
         if (!token) return;
 
@@ -156,7 +156,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to clear cart", error);
         }
-    };
+    }, []);
 
     return (
         <CartContext.Provider value={{

@@ -7,12 +7,90 @@ import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import AddressModal from "@/components/checkout/AddressModal";
+import { Address } from "@/types/address";
 
 export default function CheckoutPage() {
     const { cart, isLoading, updateQuantity, removeFromCart, refreshCart } = useCart();
     const { user } = useAuth();
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [showAddressModal, setShowAddressModal] = useState(false);
     const router = useRouter();
+
+    const handleAddressSelect = (address: Address) => {
+        setShowAddressModal(false);
+        handlePayment(address);
+    };
+
+    const handlePayment = async (shippingAddress?: Address) => {
+        if (!cart || !user) return;
+
+        // If no address passed, open modal to force selection
+        if (!shippingAddress) {
+            setShowAddressModal(true);
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            // 1. Create/Get Pending Order
+            const token = localStorage.getItem("token");
+
+            // Create order from cart
+            const orderRes = await fetch("http://localhost:8000/api/orders/create", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    shipping_address: {
+                        full_name: user.full_name,
+                        address: shippingAddress.street,
+                        city: shippingAddress.city,
+                        state: shippingAddress.state,
+                        country: shippingAddress.country,
+                        postal_code: shippingAddress.postal_code,
+                        description: shippingAddress.name // Using 'name' (e.g. Home) as description
+                    }
+                })
+            });
+
+            if (!orderRes.ok) throw new Error("Failed to create order");
+            const orderData = await orderRes.json();
+
+            // 2. Initialize Payment
+            const paymentRes = await fetch("http://localhost:8000/api/payment/initialize", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    order_id: orderData.id
+                })
+            });
+
+            if (!paymentRes.ok) throw new Error("Failed to initialize payment");
+            const paymentData = await paymentRes.json();
+
+            // 3. Render Payment Page
+            if (paymentData.payment_page_url.startsWith("http")) {
+                window.location.href = paymentData.payment_page_url;
+            } else {
+                // Store HTML content and redirect to payment rendering page
+                localStorage.setItem("paymentContent", paymentData.payment_page_url);
+                router.push("/checkout/payment");
+            }
+
+        } catch (error) {
+            console.error("Payment error:", error);
+            alert("Payment initialization failed. Please try again.");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -156,8 +234,18 @@ export default function CheckoutPage() {
                                 </div>
                             </div>
 
-                            <button className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-opacity-90 transition-all shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2">
-                                Proceed to Checkout <ArrowRight size={20} />
+                            <button
+                                onClick={() => setShowAddressModal(true)}
+                                disabled={isProcessing}
+                                className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-opacity-90 transition-all shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isProcessing ? (
+                                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                                ) : (
+                                    <>
+                                        Proceed to Checkout <ArrowRight size={20} />
+                                    </>
+                                )}
                             </button>
 
                             <p className="text-xs text-center text-gray-400 mt-4">
@@ -167,6 +255,12 @@ export default function CheckoutPage() {
                     </div>
                 </div>
             </main>
+
+            <AddressModal
+                isOpen={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
+                onSelect={handleAddressSelect}
+            />
         </div>
     );
 }

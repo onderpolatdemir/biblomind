@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
@@ -12,9 +13,11 @@ import {
     Ghost, Heart, PenTool, Landmark, FlaskConical, House, LayoutGrid, Info,
     Leaf, Feather, Baby, User, Scroll
 } from "lucide-react";
+import { CATEGORIES } from "@/lib/constants"; // Shared constants
 
 
 export default function Header() {
+    const router = useRouter();
     // Add window resize listener to adjust search bar width
     const [searchWidth, setSearchWidth] = useState(280);
     const { user, logout } = useAuth();
@@ -63,27 +66,12 @@ export default function Header() {
         }
     }, []);
 
+    const handleBookSelect = (book: { id: string; title: string }) => {
+        router.push(`/books/${book.id}`);
+    };
+
     // Get user initial or default to 'U'
     const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U';
-
-    // Categories Data with Lucide Icons
-    const CATEGORIES = [
-        { name: "Fiction", icon: Book, href: "/categories/fiction" },
-        { name: "Non-Fiction", icon: Brain, href: "/categories/non-fiction" },
-        { name: "Sci-Fi", icon: Rocket, href: "/categories/sci-fi" },
-        { name: "Fantasy", icon: Sparkles, href: "/categories/fantasy" },
-        { name: "Mystery", icon: Search, href: "/categories/mystery" },
-        { name: "Thriller", icon: Ghost, href: "/categories/thriller" },
-        { name: "Romance", icon: Heart, href: "/categories/romance" },
-        { name: "Biography", icon: PenTool, href: "/categories/biography" },
-        { name: "History", icon: Landmark, href: "/categories/history" },
-        { name: "Science", icon: FlaskConical, href: "/categories/science" },
-        { name: "Self-Help", icon: Leaf, href: "/categories/self-help" },
-        { name: "Poetry", icon: Feather, href: "/categories/poetry" },
-        { name: "Children", icon: Baby, href: "/categories/children" },
-        { name: "Young Adult", icon: User, href: "/categories/young-adult" },
-        { name: "Classics", icon: Scroll, href: "/categories/classics" },
-    ];
 
     const handleLogout = () => {
         setIsDropdownOpen(false);
@@ -136,13 +124,13 @@ export default function Header() {
                 >
 
 
-                    <Link href="/categories" className="hover:text-primary transition-colors py-4">
+                    <div className="hover:text-primary transition-colors py-4 cursor-default">
                         <div className="flex items-center gap-1">
                             <LayoutGrid />
                             Categories
                         </div>
 
-                    </Link>
+                    </div>
 
 
 
@@ -204,6 +192,7 @@ export default function Header() {
                         expandDirection="left"
                         onSearch={(q) => console.log("Search:", q)}
                         onQueryChange={handleSearchChange}
+                        onResultSelect={handleBookSelect}
                         results={searchResults}
                         className="mr-2 hover:border-primary"
                         width={searchWidth}

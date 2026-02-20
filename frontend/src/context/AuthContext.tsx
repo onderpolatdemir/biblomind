@@ -4,12 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import api from "@/lib/api";
 
-type User = {
-    email: string;
-    full_name?: string;
-    id: number;
-    is_active: boolean;
-};
+import { User } from "@/types/user";
 
 type AuthContextType = {
     user: User | null;

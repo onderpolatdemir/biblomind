@@ -6,6 +6,8 @@ import Image from "next/image";
 import Header from "@/components/layout/Header";
 import BookCard from "@/components/ui/BookCard";
 import api from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { CATEGORIES } from "@/lib/constants"; // Shared constants
 
 type Book = {
     id: string;
@@ -17,6 +19,7 @@ type Book = {
 };
 
 export default function HomePage() {
+    const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
@@ -59,6 +62,13 @@ export default function HomePage() {
 
     const triggerFileUpload = () => {
         fileInputRef.current?.click();
+    };
+
+    const handleSeeAll = () => {
+        if (CATEGORIES.length > 0) {
+            const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+            router.push(randomCategory.href);
+        }
     };
 
     return (
@@ -156,7 +166,12 @@ export default function HomePage() {
                 <section>
                     <div className="flex justify-between items-end mb-8">
                         <h2 className="text-3xl font-heading font-bold text-text">Recommended For You</h2>
-                        <button className="text-accent font-medium hover:underline">See all &rarr;</button>
+                        <button
+                            onClick={handleSeeAll}
+                            className="text-accent font-medium hover:underline"
+                        >
+                            See all &rarr;
+                        </button>
                     </div>
 
                     {isLoading ? (
