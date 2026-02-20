@@ -209,3 +209,12 @@ __marimo__/
 # BiblioMind specific
 # Test results from Vision Service
 backend/test_results/*.json
+
+# Node.js
+node_modules/
+dist/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

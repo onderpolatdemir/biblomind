@@ -16,6 +16,7 @@ export type ExpandableSearchBarProps = {
   className?: string;
   defaultOpen?: boolean;
   width?: number;
+  onResultSelect?: (result: { id: string; title: string }) => void;
 };
 
 const COLLAPSED_SIZE = 40;
@@ -30,6 +31,7 @@ export default function ExpandableSearchBar(props: ExpandableSearchBarProps) {
     className = '',
     defaultOpen = false,
     width = 280,
+    onResultSelect,
   } = props;
 
   const [open, setOpen] = useState(defaultOpen);
@@ -200,7 +202,15 @@ export default function ExpandableSearchBar(props: ExpandableSearchBarProps) {
                   className="absolute top-12 left-0 w-full bg-background border border-border rounded-xl shadow-lg overflow-hidden py-2"
                 >
                   {results.map((book) => (
-                    <div key={book.id} className="px-4 py-2 hover:bg-muted cursor-pointer transition-colors text-sm">
+                    <div
+                      key={book.id}
+                      onClick={() => {
+                        onResultSelect?.(book);
+                        setOpen(false);
+                        setValue('');
+                      }}
+                      className="px-4 py-2 hover:bg-muted cursor-pointer transition-colors text-sm"
+                    >
                       {book.title}
                     </div>
                   ))}
