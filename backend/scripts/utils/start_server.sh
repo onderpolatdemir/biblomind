@@ -48,7 +48,7 @@ else
 fi
 
 # Environment variable set et
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5433/bibliomind"
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5440/bibliomind"
 echo -e "${GREEN}✓ Environment variables ayarlandı${NC}"
 
 # Server'ı başlat

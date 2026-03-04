@@ -10,12 +10,7 @@ Tests:
 
 Usage:
     cd backend
-    
-    # Test with sample image
-    python -m scripts.test_vision_service
-    
-    # Test with custom image
-    python -m scripts.test_vision_service --image path/to/bookshelf.jpg
+    python scripts/dev/test_vision_service.py --image tests/fixtures/test_images/bookshelf.jpeg
 """
 
 import asyncio
@@ -25,11 +20,13 @@ import argparse
 import json
 from datetime import datetime
 
-# Add backend to path
-backend_dir = Path(__file__).parent.parent
+# Add backend root to path (script is at backend/scripts/dev/test_vision_service.py)
+_backend_script_dir = Path(__file__).resolve().parent  # backend/scripts/dev
+backend_dir = _backend_script_dir.parent.parent  # backend
 sys.path.insert(0, str(backend_dir))
 
 from app.services.vision_service import VisionService
+from app.services.openai_service import OpenAIService
 from app.core.config import settings
 from app.core.database import SessionLocal
 
@@ -129,6 +126,7 @@ async def test_fuzzy_matching(image_path: Path):
     
     try:
         service = VisionService()
+        openai_service = OpenAIService()
         db = SessionLocal()
         
         # Read image
@@ -137,16 +135,31 @@ async def test_fuzzy_matching(image_path: Path):
         
         print(f"Analyzing image: {image_path.name}")
         
-        # Full analysis
+        # Full analysis: OCR + DB matching
         result = await service.analyze_bookshelf_image(image_bytes, db)
+        
+        # OpenAI ile OCR sonuçlarını gerçek kitap isimlerine çevir (alt katman)
+        cleaned_books = await service.detect_and_clean_books(image_bytes, openai_service)
         
         db.close()
         
         print(f"✅ PASSED: Analysis complete")
         print(f"\nResults:")
         print("-" * 60)
-        print(f"Detected texts: {result['total_detected']}")
-        print(f"Matched books: {result['total_matched']}")
+        print(f"Detected texts (Vision OCR): {result['total_detected']}")
+        print(f"AI normalized books: {len(cleaned_books)}")
+        print(f"Matched books (DB): {result['total_matched']}")
+        
+        if cleaned_books:
+            print(f"\nAI cleaned books (Vision → readable title/author, Top 10):")
+            for i, book in enumerate(cleaned_books[:10], 1):
+                title = book.get("title", "")
+                author = book.get("author", "")
+                orig = (book.get("original_ocr") or "")[:50]
+                if len((book.get("original_ocr") or "")) > 50:
+                    orig += "..."
+                conf = book.get("confidence", 0)
+                print(f"  {i}. {title} — {author}  (OCR: \"{orig}\" | confidence: {conf:.2f})")
         
         if result['matched_books']:
             print(f"\nMatched Books (Top 10):")
@@ -154,19 +167,21 @@ async def test_fuzzy_matching(image_path: Path):
                 print(f"  {i}. {book['title']} - {book['author']}")
                 print(f"     Similarity: {book['similarity_score']:.2%}")
         else:
-            print("\n⚠️  No books matched")
+            print("\n⚠️  No books matched in DB")
             print("   Make sure database has books (run: python -m scripts.seed_books)")
         
         print("-" * 60)
         
-        # Save results to file
+        # Save results to file (Vision OCR + AI normalized names + DB matches)
         output_data = {
             "timestamp": datetime.now().isoformat(),
             "image_path": str(image_path),
             "image_name": image_path.name,
             "detected_texts": result['detected_texts'],
+            "cleaned_books": cleaned_books,
             "matched_books": result['matched_books'],
             "total_detected": result['total_detected'],
+            "total_cleaned": len(cleaned_books),
             "total_matched": result['total_matched']
         }
         

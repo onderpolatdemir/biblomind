@@ -19,7 +19,7 @@ router = APIRouter(prefix="/vision", tags=["vision"])
 
 @router.post("/test", response_model=Dict[str, Any])
 async def test_vision_ocr(
-    file: UploadFile = File(..., description="Image file (JPG/PNG, max 10MB)"),
+    file: UploadFile = File(..., description="Image file (JPG/PNG/WEBP, max 10MB)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -34,7 +34,7 @@ async def test_vision_ocr(
     **Authentication required.**
     
     **Image requirements:**
-    - Format: JPG or PNG
+    - Format: JPG, PNG or WEBP
     - Max size: 10MB
     - Recommended: Clear, well-lit bookshelf photo
     
@@ -60,10 +60,10 @@ async def test_vision_ocr(
     start_time = time.time()
     
     # Validate file type
-    if file.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
+    if file.content_type not in ["image/jpeg", "image/jpg", "image/png", "image/webp"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG supported."
+            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG/WEBP supported."
         )
     
     try:
@@ -110,7 +110,7 @@ async def test_vision_ocr(
 
 @router.post("/match-shelf", response_model=Dict[str, Any])
 async def match_bookshelf_to_user(
-    file: UploadFile = File(..., description="Bookshelf image (JPG/PNG, max 10MB)"),
+    file: UploadFile = File(..., description="Bookshelf image (JPG/PNG/WEBP, max 10MB)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -167,10 +167,10 @@ async def match_bookshelf_to_user(
     start_time = time.time()
     
     # Validate file type
-    if file.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
+    if file.content_type not in ["image/jpeg", "image/jpg", "image/png", "image/webp"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG supported."
+            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG/WEBP supported."
         )
     
     try:
