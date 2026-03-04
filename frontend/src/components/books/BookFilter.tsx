@@ -23,7 +23,11 @@ export interface FilterState {
     maxPrice: number;
 }
 
+const INITIAL_VISIBLE = 8;
+
 export default function BookFilter({ selectedCategory, onFilterChange }: BookFilterProps) {
+    const [showAllCategories, setShowAllCategories] = useState(false);
+
     // State for filters
     const [titleSearch, setTitleSearch] = useState("");
     const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
@@ -129,24 +133,44 @@ export default function BookFilter({ selectedCategory, onFilterChange }: BookFil
                     Categories
                     <span className="text-primary text-2xl">⌄</span>
                 </h3>
-                <div className="space-y-2">
-                    {CATEGORIES.map((cat) => {
-                        const isSelected = selectedCategory.toLowerCase() === cat.name.toLowerCase().replace(" ", "-");
-                        return (
-                            <Link
-                                key={cat.name}
-                                href={cat.href}
-                                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${isSelected
-                                    ? "bg-primary/10 text-primary font-bold"
-                                    : "text-gray-500 hover:bg-gray-50 hover:text-text"
-                                    }`}
-                            >
-                                <div className={`w-2 h-2 rounded-full border ${isSelected ? "bg-primary border-primary" : "border-gray-300"}`} />
-                                <span className="text-sm">{cat.name}</span>
-                            </Link>
-                        );
-                    })}
-                    <button className="text-primary text-sm font-bold mt-2 hover:underline">+ Load More</button>
+                <div className="space-y-1">
+                    <AnimatePresence initial={false}>
+                        {CATEGORIES.slice(0, showAllCategories ? CATEGORIES.length : INITIAL_VISIBLE).map((cat) => {
+                            const isSelected = selectedCategory.toLowerCase() === cat.href.split("/").pop();
+                            return (
+                                <motion.div
+                                    key={cat.name}
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="overflow-hidden"
+                                >
+                                    <Link
+                                        href={cat.href}
+                                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${isSelected
+                                            ? "bg-primary/10 text-primary font-bold"
+                                            : "text-gray-500 hover:bg-gray-50 hover:text-text"
+                                            }`}
+                                    >
+                                        <div className={`w-2 h-2 rounded-full border flex-shrink-0 ${isSelected ? "bg-primary border-primary" : "border-gray-300"}`} />
+                                        <span className="text-sm">{cat.name}</span>
+                                    </Link>
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
+
+                    {CATEGORIES.length > INITIAL_VISIBLE && (
+                        <button
+                            onClick={() => setShowAllCategories((v) => !v)}
+                            className="text-primary text-sm font-bold mt-2 hover:underline flex items-center gap-1"
+                        >
+                            {showAllCategories
+                                ? `− Show Less`
+                                : `+ ${CATEGORIES.length - INITIAL_VISIBLE} More Categories`}
+                        </button>
+                    )}
                 </div>
             </div>
 

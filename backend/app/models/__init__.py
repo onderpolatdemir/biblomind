@@ -9,6 +9,7 @@ from app.models.order import Order, OrderItem, OrderStatus
 from app.models.address import Address
 from app.models.conversation import Conversation, ConversationMessage
 from app.models.user_connection import UserConnection
+from app.models.review import Review
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "Conversation",
     "ConversationMessage",
     "UserConnection",
+    "Review",
 ]

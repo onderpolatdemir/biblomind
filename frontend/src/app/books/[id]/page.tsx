@@ -1,15 +1,16 @@
 "use client";
 
-import { useFavorites } from "@/context/FavoritesContext"; // Add import
+import { useFavorites } from "@/context/FavoritesContext";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import BookCard from "@/components/ui/BookCard";
-import { Star, Heart, Share2, Minus, Plus, ShoppingCart, User } from "lucide-react";
+import { Star, Heart, Minus, Plus, ShoppingCart, User, Send, Trash2, Pencil } from "lucide-react";
+import api from "@/lib/api";
 
 // Types
 interface Book {
@@ -25,6 +26,32 @@ interface Book {
     stock: number;
 }
 
+interface ReviewItem {
+    id: string;
+    user_id: string;
+    book_id: string;
+    rating: number;
+    comment?: string;
+    reviewer_name?: string;
+    created_at: string;
+}
+
+interface BookReviewsData {
+    reviews: ReviewItem[];
+    total: number;
+    average_rating: number;
+    rating_distribution: Record<number, number>;
+}
+
+interface SimilarBook {
+    id: string;
+    title: string;
+    author: string;
+    cover_url?: string;
+    price?: number;
+    similarity_score: number;
+}
+
 export default function BookDetailPage() {
     const params = useParams();
     const { id } = params;
@@ -34,13 +61,75 @@ export default function BookDetailPage() {
     const router = useRouter();
 
     const [book, setBook] = useState<Book | null>(null);
-    const [relatedBooks, setRelatedBooks] = useState<Book[]>([]);
+    const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
+    const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [quantity, setQuantity] = useState(1);
     const [isAdded, setIsAdded] = useState(false);
     const [activeTab, setActiveTab] = useState<"details" | "reviews">("details");
 
-    const isLiked = book ? isFavorite(book.id) : false; // Derived state
+    // Reviews state
+    const [reviewsData, setReviewsData] = useState<BookReviewsData | null>(null);
+    const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+    const [myRating, setMyRating] = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [myComment, setMyComment] = useState("");
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [reviewSuccess, setReviewSuccess] = useState(false);
+    const [editingReview, setEditingReview] = useState<ReviewItem | null>(null);
+
+    const isLiked = book ? isFavorite(book.id) : false;
+
+    const fetchReviews = useCallback(async () => {
+        if (!id) return;
+        setIsLoadingReviews(true);
+        try {
+            const res = await api.get(`/reviews/books/${id}/reviews`);
+            setReviewsData(res.data);
+            // Pre-fill form if user already has a review
+            if (user) {
+                const mine = res.data.reviews.find((r: ReviewItem) => r.user_id === user.id);
+                if (mine) {
+                    setEditingReview(mine);
+                    setMyRating(mine.rating);
+                    setMyComment(mine.comment ?? "");
+                }
+            }
+        } catch {
+            setReviewsData(null);
+        } finally {
+            setIsLoadingReviews(false);
+        }
+    }, [id, user]);
+
+    const submitReview = async () => {
+        if (!user) { router.push("/auth/login"); return; }
+        if (myRating === 0) return;
+        setIsSubmittingReview(true);
+        try {
+            await api.post(`/reviews/books/${id}/reviews`, { rating: myRating, comment: myComment || null });
+            setReviewSuccess(true);
+            setTimeout(() => setReviewSuccess(false), 2000);
+            fetchReviews();
+        } catch {
+            // ignore
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
+
+    const deleteMyReview = async () => {
+        if (!id) return;
+        try {
+            await api.delete(`/reviews/books/${id}/reviews`);
+            setEditingReview(null);
+            setMyRating(0);
+            setMyComment("");
+            fetchReviews();
+        } catch {
+            // ignore
+        }
+    };
 
     const handleAddToCart = () => {
         if (book) {
@@ -64,19 +153,10 @@ export default function BookDetailPage() {
     useEffect(() => {
         const fetchBookData = async () => {
             try {
-                // Fetch main book details
                 const res = await fetch(`http://localhost:8000/api/books/${id}`);
                 if (!res.ok) throw new Error("Book not found");
                 const data = await res.json();
                 setBook(data);
-
-                // Fetch related books (mocking by just fetching latest 4 books for now)
-                // In a real app, we'd filter by genre or author
-                const relatedRes = await fetch(`http://localhost:8000/api/books?page_size=4`);
-                if (relatedRes.ok) {
-                    const relatedData = await relatedRes.json();
-                    setRelatedBooks(relatedData.items.filter((b: Book) => b.id !== id));
-                }
             } catch (error) {
                 console.error("Error fetching book:", error);
             } finally {
@@ -88,6 +168,44 @@ export default function BookDetailPage() {
             fetchBookData();
         }
     }, [id]);
+
+    // Similar books: ayrı useEffect ile AI benzerlik endpoint'inden çek
+    useEffect(() => {
+        if (!id) return;
+        setIsLoadingSimilar(true);
+        api.get(`/recommendations/similar/${id}?limit=4`)
+            .then((res) => {
+                setSimilarBooks(res.data?.similar_books ?? []);
+            })
+            .catch(async () => {
+                // embedding yoksa genre bazlı fallback
+                try {
+                    const fallback = await fetch(`http://localhost:8000/api/books?page_size=5`);
+                    if (fallback.ok) {
+                        const data = await fallback.json();
+                        const items = (data.items ?? []).filter((b: Book) => b.id !== id).slice(0, 4);
+                        setSimilarBooks(items.map((b: Book) => ({ ...b, similarity_score: 0 })));
+                    }
+                } catch { /* sessizce geç */ }
+            })
+            .finally(() => setIsLoadingSimilar(false));
+    }, [id]);
+
+    // view etkileşimini kaydet (kullanıcı giriş yapmışsa)
+    useEffect(() => {
+        if (!id || !user) return;
+        api.post("/users/me/interactions", {
+            book_id: id,
+            interaction_type: "view",
+        }).catch(() => {/* sessizce geç */});
+    }, [id, user]);
+
+    // Reviews tab açıldığında yükle
+    useEffect(() => {
+        if (activeTab === "reviews") {
+            fetchReviews();
+        }
+    }, [activeTab, fetchReviews]);
 
     if (isLoading) {
         return (
@@ -121,7 +239,6 @@ export default function BookDetailPage() {
         format: "Paperback",
         pages: 450,
         language: "English",
-        reviews_count: 127
     };
 
     return (
@@ -159,7 +276,9 @@ export default function BookDetailPage() {
                                 <Star className="w-4 h-4 fill-orange-400 text-orange-400" />
                                 <span className="text-sm font-bold text-orange-700">{book.rating || 4.5}</span>
                             </div>
-                            <span className="text-sm text-gray-500 underline cursor-pointer">{mockDetails.reviews_count} Reviews</span>
+                            <button onClick={() => setActiveTab("reviews")} className="text-sm text-gray-500 underline cursor-pointer hover:text-primary transition-colors">
+                                {reviewsData ? `${reviewsData.total} Reviews` : "Reviews"}
+                            </button>
                         </div>
 
                         <h1 className="text-4xl md:text-5xl font-heading font-bold text-text mb-2 leading-tight">
@@ -257,109 +376,221 @@ export default function BookDetailPage() {
                     </div>
                 </div>
 
-                {/* Details & Specs Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-20">
-                    {/* Specs Table */}
-                    <div className="lg:col-span-5">
-                        <h3 className="text-2xl font-heading font-bold text-text mb-6">Details</h3>
-                        <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
-                            <div className="space-y-4">
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Book Title</span>
-                                    <span className="text-text font-bold text-right">{book.title}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Author</span>
-                                    <span className="text-text font-bold text-right">{book.author}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Categories</span>
-                                    <span className="text-text font-bold text-right">{book.genres?.slice(0, 3).join(", ") || "N/A"}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">ISBN</span>
-                                    <span className="text-text font-bold text-right">{book.isbn || "N/A"}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Edition Language</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.language}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Book Format</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.format}, {mockDetails.pages} Pages</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Date Published</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.publishedDate}</span>
-                                </div>
-                                <div className="flex justify-between py-3">
-                                    <span className="text-gray-500 font-medium">Publisher</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.publisher}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Reviews Visualization (Right side logic) */}
-                    <div className="lg:col-span-1"></div> {/* Spacer */}
-                    <div className="lg:col-span-6">
-                        <h3 className="text-2xl font-heading font-bold text-text mb-6">Customer Reviews</h3>
-                        <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 flex flex-col md:flex-row gap-8 items-center">
-                            {/* Big Score */}
-                            <div className="text-center md:text-left min-w-[120px]">
-                                <div className="text-6xl font-bold text-text mb-2">4.7</div>
-                                <div className="flex justify-center md:justify-start gap-1 mb-2">
-                                    {[1, 2, 3, 4, 5].map(s => (
-                                        <Star key={s} className="w-4 h-4 fill-orange-400 text-orange-400" />
-                                    ))}
-                                </div>
-                                <p className="text-sm text-gray-500">out of 5</p>
-                            </div>
-
-                            {/* Bars */}
-                            <div className="flex-1 w-full space-y-3">
-                                {[
-                                    { stars: 5, pct: "85%" },
-                                    { stars: 4, pct: "10%" },
-                                    { stars: 3, pct: "3%" },
-                                    { stars: 2, pct: "1%" },
-                                    { stars: 1, pct: "1%" },
-                                ].map((row) => (
-                                    <div key={row.stars} className="flex items-center gap-3 text-sm">
-                                        <span className="font-bold w-3">{row.stars}</span>
-                                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-orange-400 rounded-full" style={{ width: row.pct }}></div>
-                                        </div>
-                                        <span className="w-8 text-right font-medium text-gray-500">{row.pct}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="mt-6 flex justify-center md:justify-start">
-                            <button className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md font-bold text-text transition-all">
-                                View reviews ↓
+                {/* Tabs: Details / Reviews */}
+                <div className="mb-10">
+                    <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-8">
+                        {(["details", "reviews"] as const).map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`px-6 py-2.5 rounded-lg font-bold text-sm capitalize transition-all ${
+                                    activeTab === tab
+                                        ? "bg-white text-text shadow-sm"
+                                        : "text-gray-500 hover:text-gray-700"
+                                }`}
+                            >
+                                {tab === "reviews" && reviewsData ? `Reviews (${reviewsData.total})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Related Books */}
-                <div className="mb-8">
-                    <h3 className="text-2xl font-heading font-bold text-text mb-8">Related books</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {relatedBooks.map((related) => (
-                            <div key={related.id} className="block h-full">
-                                <BookCard
-                                    id={related.id}
-                                    title={related.title}
-                                    author={related.author}
-                                    price={Number(related.price)}
-                                    rating={related.rating || 4.5}
-                                    imageSrc={related.cover_url || "/book-placeholder.jpg"}
-                                />
-                            </div>
                         ))}
                     </div>
+
+                    {/* Details Tab */}
+                    {activeTab === "details" && (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                            <div className="lg:col-span-5">
+                                <h3 className="text-2xl font-heading font-bold text-text mb-6">Book Details</h3>
+                                <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
+                                    <div className="space-y-4">
+                                        {[
+                                            { label: "Book Title", value: book.title },
+                                            { label: "Author", value: book.author },
+                                            { label: "Categories", value: book.genres?.slice(0, 3).join(", ") || "N/A" },
+                                            { label: "ISBN", value: book.isbn || "N/A" },
+                                            { label: "Edition Language", value: mockDetails.language },
+                                            { label: "Book Format", value: `${mockDetails.format}, ${mockDetails.pages} Pages` },
+                                            { label: "Date Published", value: mockDetails.publishedDate },
+                                            { label: "Publisher", value: mockDetails.publisher },
+                                        ].map(({ label, value }, i, arr) => (
+                                            <div key={label} className={`flex justify-between py-3 ${i < arr.length - 1 ? "border-b border-gray-200" : ""}`}>
+                                                <span className="text-gray-500 font-medium">{label}</span>
+                                                <span className="text-text font-bold text-right max-w-[55%]">{value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Reviews Tab */}
+                    {activeTab === "reviews" && (
+                        <div className="space-y-8">
+                            {/* Summary Bar */}
+                            {reviewsData && reviewsData.total > 0 && (
+                                <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 flex flex-col md:flex-row gap-8 items-center">
+                                    <div className="text-center min-w-[120px]">
+                                        <div className="text-6xl font-bold text-text mb-2">{reviewsData.average_rating.toFixed(1)}</div>
+                                        <div className="flex justify-center gap-1 mb-2">
+                                            {[1,2,3,4,5].map(s => (
+                                                <Star key={s} className={`w-4 h-4 ${s <= Math.round(reviewsData.average_rating) ? "fill-orange-400 text-orange-400" : "text-gray-200"}`} />
+                                            ))}
+                                        </div>
+                                        <p className="text-sm text-gray-500">{reviewsData.total} reviews</p>
+                                    </div>
+                                    <div className="flex-1 w-full space-y-2">
+                                        {[5,4,3,2,1].map((s) => {
+                                            const cnt = reviewsData.rating_distribution[s] ?? 0;
+                                            const pct = reviewsData.total > 0 ? (cnt / reviewsData.total) * 100 : 0;
+                                            return (
+                                                <div key={s} className="flex items-center gap-3 text-sm">
+                                                    <span className="font-bold w-3">{s}</span>
+                                                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-orange-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                    <span className="w-8 text-right font-medium text-gray-500">{cnt}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Write Review Form */}
+                            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                                <h4 className="font-heading font-bold text-text text-lg mb-4 flex items-center gap-2">
+                                    {editingReview ? <><Pencil size={16} className="text-primary" /> Edit Your Review</> : "Write a Review"}
+                                </h4>
+                                {!user ? (
+                                    <p className="text-gray-500 text-sm">
+                                        <Link href="/auth/login" className="text-primary font-bold hover:underline">Log in</Link> to leave a review.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {/* Star Picker */}
+                                        <div className="flex gap-1">
+                                            {[1,2,3,4,5].map((s) => (
+                                                <button
+                                                    key={s}
+                                                    onMouseEnter={() => setHoverRating(s)}
+                                                    onMouseLeave={() => setHoverRating(0)}
+                                                    onClick={() => setMyRating(s)}
+                                                    className="p-0.5"
+                                                >
+                                                    <Star className={`w-7 h-7 transition-colors ${s <= (hoverRating || myRating) ? "fill-orange-400 text-orange-400" : "text-gray-200"}`} />
+                                                </button>
+                                            ))}
+                                            {myRating > 0 && (
+                                                <span className="ml-2 text-sm font-bold text-gray-600 self-center">
+                                                    {["", "Poor", "Fair", "Good", "Great", "Excellent"][myRating]}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <textarea
+                                            value={myComment}
+                                            onChange={(e) => setMyComment(e.target.value)}
+                                            placeholder="Share your thoughts about this book (optional)..."
+                                            rows={3}
+                                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-text placeholder-gray-400 focus:outline-none focus:border-primary resize-none"
+                                        />
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={submitReview}
+                                                disabled={isSubmittingReview || myRating === 0}
+                                                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 disabled:opacity-50 transition-all text-sm"
+                                            >
+                                                <Send size={14} />
+                                                {isSubmittingReview ? "Saving..." : reviewSuccess ? "Saved!" : editingReview ? "Update Review" : "Post Review"}
+                                            </button>
+                                            {editingReview && (
+                                                <button
+                                                    onClick={deleteMyReview}
+                                                    className="flex items-center gap-2 px-4 py-2.5 border border-red-200 text-red-500 font-bold rounded-xl hover:bg-red-50 transition-all text-sm"
+                                                >
+                                                    <Trash2 size={14} /> Delete
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Review List */}
+                            {isLoadingReviews ? (
+                                <div className="space-y-3">
+                                    {[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}
+                                </div>
+                            ) : reviewsData && reviewsData.reviews.length > 0 ? (
+                                <div className="space-y-4">
+                                    {reviewsData.reviews.map((review) => (
+                                        <div key={review.id} className="bg-white rounded-2xl border border-gray-100 p-5">
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
+                                                    {review.reviewer_name?.charAt(0)?.toUpperCase() ?? "?"}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="font-bold text-text text-sm">{review.reviewer_name ?? "Anonymous"}</span>
+                                                        <div className="flex gap-0.5">
+                                                            {[1,2,3,4,5].map(s => (
+                                                                <Star key={s} className={`w-3 h-3 ${s <= review.rating ? "fill-orange-400 text-orange-400" : "text-gray-200"}`} />
+                                                            ))}
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 ml-auto">
+                                                            {new Date(review.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                        </span>
+                                                    </div>
+                                                    {review.comment && <p className="text-gray-600 text-sm leading-relaxed">{review.comment}</p>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 text-gray-400">
+                                    <Star className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                                    <p className="font-medium">No reviews yet. Be the first to review!</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Similar Books */}
+                <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-8">
+                        <h3 className="text-2xl font-heading font-bold text-text">Similar Books</h3>
+                        <span className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-full">AI Powered</span>
+                    </div>
+
+                    {isLoadingSimilar ? (
+                        <div className="flex gap-6">
+                            {[1,2,3,4].map(i => (
+                                <div key={i} className="flex-1 h-72 bg-gray-100 rounded-2xl animate-pulse" />
+                            ))}
+                        </div>
+                    ) : similarBooks.length === 0 ? (
+                        <p className="text-gray-400 text-sm">No similar books found.</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {similarBooks.map((related) => (
+                                <div key={related.id} className="relative">
+                                    {related.similarity_score > 0 && (
+                                        <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-primary text-xs font-bold px-2 py-1 rounded-full shadow-sm border border-primary/20">
+                                            {Math.round(related.similarity_score * 100)}% match
+                                        </div>
+                                    )}
+                                    <BookCard
+                                        id={related.id}
+                                        title={related.title}
+                                        author={related.author || ""}
+                                        price={Number(related.price ?? 0)}
+                                        rating={4.5}
+                                        imageSrc={related.cover_url || "/book-placeholder.jpg"}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
             </main>

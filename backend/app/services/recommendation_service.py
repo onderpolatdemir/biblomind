@@ -1,6 +1,7 @@
 """Recommendation service for personalized book suggestions."""
 
 import logging
+import random
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -314,16 +315,20 @@ class RecommendationService:
             
             # Only include if score is reasonable
             if content_score > 0.5:
+                jitter = random.uniform(-0.04, 0.04)
+                final = round(max(0.0, min(1.0, content_score + jitter)), 3)
                 recommendations.append({
                     "book": self._format_book(book),
-                    "score": round(float(content_score), 3),
+                    "score": final,
                     "match_reasons": ["content_similarity"],
-                    "explanation": ""  # Will be filled later
+                    "explanation": ""
                 })
-                
+
                 if len(recommendations) >= limit:
                     break
-        
+
+        # Re-sort after jitter so overall quality ordering is preserved
+        recommendations.sort(key=lambda x: x["score"], reverse=True)
         return recommendations
     
     async def _get_hybrid_recommendations(
@@ -411,7 +416,12 @@ class RecommendationService:
                 }
             })
         
-        # Sort by final score and return top N
+        # Add small random jitter so order varies between calls while
+        # still favouring high-scoring books (jitter ±5% of score range)
+        for rec in recommendations:
+            rec["score"] += random.uniform(-0.05, 0.05)
+            rec["score"] = round(max(0.0, min(1.0, rec["score"])), 3)
+
         recommendations.sort(key=lambda x: x["score"], reverse=True)
         return recommendations[:limit]
     
@@ -430,7 +440,9 @@ class RecommendationService:
         Returns:
             List of recommendation dicts
         """
-        # Query most popular books (by interaction count)
+        # Fetch a larger pool so we can randomly sample from it
+        pool_size = max(limit * 4, 40)
+
         query = self.db.query(
             Book,
             func.count(UserInteraction.id).label('interaction_count')
@@ -443,16 +455,39 @@ class RecommendationService:
         if excluded_book_ids:
             query = query.filter(Book.id.notin_(excluded_book_ids))
         
-        popular_books = query.order_by(
+        pool = query.order_by(
             func.count(UserInteraction.id).desc()
-        ).limit(limit).all()
-        
+        ).limit(pool_size).all()
+
+        # Weighted random sample: more-popular books are more likely to appear
+        # but order is never deterministic
+        if len(pool) <= limit:
+            selected = pool
+        else:
+            weights = [max(1, cnt) for _, cnt in pool]
+            selected = random.choices(pool, weights=weights, k=limit * 2)
+            # Deduplicate while preserving weighted randomness
+            seen_ids = set()
+            unique_selected = []
+            for item in selected:
+                bid = item[0].id
+                if bid not in seen_ids:
+                    seen_ids.add(bid)
+                    unique_selected.append(item)
+                if len(unique_selected) >= limit:
+                    break
+            # If we still need more, fill from remaining pool
+            if len(unique_selected) < limit:
+                remaining = [p for p in pool if p[0].id not in seen_ids]
+                unique_selected.extend(remaining[:limit - len(unique_selected)])
+            selected = unique_selected
+
         # Format results
         recommendations = []
-        for book, interaction_count in popular_books:
+        for book, interaction_count in selected:
             recommendations.append({
                 "book": self._format_book(book),
-                "score": 0.8,  # Default score for popular books
+                "score": 0.8,
                 "match_reasons": ["popular"],
                 "explanation": f"Bu kitap platformumuzda çok beğeniliyor! {interaction_count} etkileşim."
             })

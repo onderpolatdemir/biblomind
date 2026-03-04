@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CheckCircle, XCircle, ArrowRight, Home } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useCart } from "@/context/CartContext";
+import api from "@/lib/api";
 
 export default function CheckoutResultPage() {
     const searchParams = useSearchParams();
@@ -21,12 +22,26 @@ export default function CheckoutResultPage() {
     useEffect(() => {
         if (status === "success") {
             setIsSuccess(true);
-            // Refresh cart to show it's empty (since items moved to order)
             refreshCart();
+
+            // Siparişteki her kitap için 'purchase' etkileşimi kaydet
+            if (orderId) {
+                api.get(`/orders/${orderId}`)
+                    .then((res) => {
+                        const items: { book_id: string }[] = res.data?.items ?? [];
+                        items.forEach((item) => {
+                            api.post("/users/me/interactions", {
+                                book_id: item.book_id,
+                                interaction_type: "purchase",
+                            }).catch(() => {/* sessizce geç */});
+                        });
+                    })
+                    .catch(() => {/* sessizce geç */});
+            }
         } else {
             setIsSuccess(false);
         }
-    }, [status, refreshCart]);
+    }, [status, orderId, refreshCart]);
 
     return (
         <div className="min-h-screen bg-gray-50">
