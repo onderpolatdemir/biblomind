@@ -214,11 +214,10 @@ export default function BookBuddiesPage() {
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={(e) => connectBuddy(buddy.user_id, e)}
-                                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all ${
-                                            connectedIds.has(buddy.user_id)
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-text text-white hover:bg-accent"
-                                        }`}
+                                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all ${connectedIds.has(buddy.user_id)
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-text text-white hover:bg-accent"
+                                            }`}
                                     >
                                         {connectedIds.has(buddy.user_id) ? (
                                             <><CheckCircle size={12} /> Connected</>
@@ -329,11 +328,11 @@ export default function BookBuddiesPage() {
                                 ) : (
                                     <>
                                         {/* Shared Genres */}
-                                        {sharedInterests?.shared_genres?.length > 0 && (
+                                        {(sharedInterests?.shared_genres?.length ?? 0) > 0 && (
                                             <div>
                                                 <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide">Shared Genres</h3>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {flatGenres(sharedInterests.shared_genres).slice(0, 5).map((g) => (
+                                                    {flatGenres(sharedInterests?.shared_genres || []).slice(0, 5).map((g) => (
                                                         <span key={g} className="px-3 py-1 bg-primary/20 text-text text-sm rounded-full font-medium">
                                                             {g}
                                                         </span>
@@ -343,11 +342,11 @@ export default function BookBuddiesPage() {
                                         )}
 
                                         {/* Shared Authors */}
-                                        {sharedInterests?.shared_authors?.length > 0 && (
+                                        {(sharedInterests?.shared_authors?.length ?? 0) > 0 && (
                                             <div>
                                                 <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide">Shared Authors</h3>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {sharedInterests.shared_authors.map((a) => (
+                                                    {sharedInterests?.shared_authors?.map((a) => (
                                                         <span key={a} className="px-3 py-1 bg-secondary text-text text-sm rounded-full">
                                                             {a}
                                                         </span>
@@ -357,11 +356,11 @@ export default function BookBuddiesPage() {
                                         )}
 
                                         {/* Mutual Books */}
-                                        {sharedInterests?.mutual_books?.length > 0 && (
+                                        {(sharedInterests?.mutual_books?.length ?? 0) > 0 && (
                                             <div>
                                                 <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide">Books You Both Love</h3>
                                                 <div className="space-y-2">
-                                                    {sharedInterests.mutual_books.map((b) => (
+                                                    {sharedInterests?.mutual_books?.map((b) => (
                                                         <div key={b.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
                                                             <div className="relative w-8 h-12 rounded overflow-hidden bg-secondary flex-shrink-0">
                                                                 {b.cover_url ? (
@@ -420,11 +419,10 @@ export default function BookBuddiesPage() {
                             <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3">
                                 <button
                                     onClick={(e) => connectBuddy(selectedBuddy.user_id, e)}
-                                    className={`flex-1 py-3 rounded-full font-bold text-sm transition-all ${
-                                        connectedIds.has(selectedBuddy.user_id)
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-text text-white hover:bg-accent"
-                                    }`}
+                                    className={`flex-1 py-3 rounded-full font-bold text-sm transition-all ${connectedIds.has(selectedBuddy.user_id)
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-text text-white hover:bg-accent"
+                                        }`}
                                 >
                                     {connectedIds.has(selectedBuddy.user_id) ? "Connected!" : `Connect with ${selectedBuddy.full_name?.split(" ")[0]}`}
                                 </button>
