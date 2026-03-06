@@ -4,6 +4,7 @@ import './globals.css'
 import { FavoritesProvider } from '@/context/FavoritesContext'
 import { CartProvider } from '@/context/CartContext'
 import { AuthProvider } from '@/context/AuthContext'
+import ChatWidget from '@/components/chat/ChatWidget'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -34,6 +35,7 @@ export default function RootLayout({
           <FavoritesProvider>
             <CartProvider>
               {children}
+              <ChatWidget />
             </CartProvider>
           </FavoritesProvider>
         </AuthProvider>

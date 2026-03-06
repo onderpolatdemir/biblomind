@@ -6,6 +6,7 @@ Matches users based on reading preferences using pgvector similarity.
 
 from typing import List, Dict, Any, Optional
 from uuid import UUID
+import numpy as np
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
 
@@ -29,37 +30,35 @@ class SocialService:
         user_b: User
     ) -> float:
         """
-        Calculate similarity between two users using preference vectors.
-        
-        Uses pgvector cosine similarity on preferences_vector.
+        Calculate cosine similarity between two users' preference vectors.
+
+        Uses pure-Python / numpy calculation on the list values loaded from
+        the DB (pgvector's SQLAlchemy .cosine_distance() is a query builder
+        expression and cannot be called on fetched Python lists).
+
         Returns 0.0 if either user doesn't have a preference vector.
-        
-        Args:
-            user_a: First user
-            user_b: Second user
-        
-        Returns:
-            Similarity score (0.0-1.0)
         """
-        # Both users must have preference vectors
         if user_a.preferences_vector is None or user_b.preferences_vector is None:
             return 0.0
-        
+
         try:
-            # Calculate cosine distance using pgvector
-            # Similarity = 1 - cosine_distance (lower distance = more similar)
-            distance = user_a.preferences_vector.cosine_distance(user_b.preferences_vector)
-            similarity = 1.0 - float(distance)
-            
-            # Ensure similarity is in [0, 1] range
+            vec_a = np.array(user_a.preferences_vector, dtype=np.float32)
+            vec_b = np.array(user_b.preferences_vector, dtype=np.float32)
+
+            norm_a = np.linalg.norm(vec_a)
+            norm_b = np.linalg.norm(vec_b)
+
+            if norm_a == 0.0 or norm_b == 0.0:
+                return 0.0
+
+            similarity = float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
             similarity = max(0.0, min(1.0, similarity))
-            
+
             logger.debug(
-                f"User similarity calculated: {user_a.id} <-> {user_b.id} = {similarity:.3f}"
+                f"User similarity: {user_a.id} <-> {user_b.id} = {similarity:.3f}"
             )
-            
             return similarity
-            
+
         except Exception as e:
             logger.error(f"Error calculating user similarity: {e}")
             return 0.0
@@ -68,98 +67,177 @@ class SocialService:
         self,
         user_id: UUID,
         limit: int = 10,
-        min_interactions: int = 5,
-        min_similarity: float = 0.5
+        min_interactions: int = 1,
+        min_similarity: float = 0.3
     ) -> List[Dict[str, Any]]:
         """
         Find users with similar reading preferences (Book Buddies).
-        
-        Args:
-            user_id: Target user ID
-            limit: Maximum number of buddies to return
-            min_interactions: Minimum interactions required for matching
-            min_similarity: Minimum similarity threshold (0.0-1.0)
-        
-        Returns:
-            List of buddy matches with metadata
+
+        Calculates live similarity, upserts results into user_connections
+        as status='suggested' for caching, then returns top matches.
+        Blocked users are excluded.
         """
         try:
-            # Get target user
             user = self.db.query(User).filter(User.id == user_id).first()
-            if not user or not user.preferences_vector:
+            if not user or user.preferences_vector is None:
                 logger.warning(f"User {user_id} has no preference vector")
                 return []
-            
-            # Get users with preference vectors and sufficient interactions
-            # Exclude self
+
+            # Exclude users already blocked in either direction
+            blocked_ids = {
+                c.buddy_id if c.user_id == user_id else c.user_id
+                for c in self.db.query(UserConnection).filter(
+                    or_(
+                        UserConnection.user_id == user_id,
+                        UserConnection.buddy_id == user_id
+                    ),
+                    UserConnection.status == "blocked"
+                ).all()
+            }
+
             candidate_users = (
                 self.db.query(User)
                 .filter(
                     User.id != user_id,
-                    User.preferences_vector.isnot(None)
+                    User.preferences_vector.isnot(None),
+                    ~User.id.in_(blocked_ids) if blocked_ids else True
                 )
                 .all()
             )
-            
-            # Calculate similarity for each candidate
+
             buddies = []
             for candidate in candidate_users:
-                # Check interaction count
                 interaction_count = (
                     self.db.query(UserInteraction)
                     .filter(UserInteraction.user_id == candidate.id)
                     .count()
                 )
-                
                 if interaction_count < min_interactions:
                     continue
-                
-                # Calculate similarity using pgvector
+
                 similarity = self.calculate_user_similarity(user, candidate)
-                
-                if similarity >= min_similarity:
-                    # Count shared books (both users interacted with same book)
-                    shared_books_count = (
-                        self.db.query(func.count(UserInteraction.book_id.distinct()))
-                        .filter(
-                            or_(
-                                and_(
-                                    UserInteraction.user_id == user_id,
-                                    UserInteraction.book_id.in_(
-                                        self.db.query(UserInteraction.book_id)
-                                        .filter(UserInteraction.user_id == candidate.id)
-                                    )
-                                )
+                if similarity < min_similarity:
+                    continue
+
+                shared_books_count = (
+                    self.db.query(func.count(UserInteraction.book_id.distinct()))
+                    .filter(
+                        and_(
+                            UserInteraction.user_id == user_id,
+                            UserInteraction.book_id.in_(
+                                self.db.query(UserInteraction.book_id)
+                                .filter(UserInteraction.user_id == candidate.id)
                             )
                         )
-                        .scalar() or 0
                     )
-                    
-                    buddies.append({
-                        "user_id": candidate.id,
-                        "email": candidate.email,
-                        "full_name": candidate.full_name,
-                        "compatibility_score": round(similarity, 3),
-                        "shared_books": shared_books_count,
-                        "total_interactions": interaction_count
-                    })
-            
-            # Sort by compatibility score (descending)
+                    .scalar() or 0
+                )
+
+                # Count shared genres
+                user_books = (
+                    self.db.query(Book)
+                    .join(UserInteraction, Book.id == UserInteraction.book_id)
+                    .filter(UserInteraction.user_id == user_id)
+                    .all()
+                )
+                cand_books = (
+                    self.db.query(Book)
+                    .join(UserInteraction, Book.id == UserInteraction.book_id)
+                    .filter(UserInteraction.user_id == candidate.id)
+                    .all()
+                )
+                def _flat(books):
+                    s = set()
+                    for b in books:
+                        for g_str in (b.genres or []):
+                            for part in g_str.split(","):
+                                t = part.strip()
+                                if t:
+                                    s.add(t)
+                    return s
+
+                user_genres = _flat(user_books)
+                cand_genres = _flat(cand_books)
+                shared_genres_count = len(user_genres & cand_genres)
+
+                buddies.append({
+                    "user_id": candidate.id,
+                    "email": candidate.email,
+                    "full_name": candidate.full_name,
+                    "compatibility_score": round(similarity, 3),
+                    "shared_books": shared_books_count,
+                    "shared_genres_count": shared_genres_count,
+                    "total_interactions": interaction_count,
+                })
+
+                # Upsert into user_connections as 'suggested'
+                self._upsert_connection(
+                    user_id=user_id,
+                    buddy_id=candidate.id,
+                    compatibility_score=similarity,
+                    shared_books=shared_books_count,
+                    shared_genres=shared_genres_count,
+                    status="suggested",
+                )
+
+            try:
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+
             buddies.sort(key=lambda x: x["compatibility_score"], reverse=True)
-            
-            # Limit results
             buddies = buddies[:limit]
-            
+
             logger.info(
                 f"Found {len(buddies)} book buddies for user {user_id} "
                 f"(min_similarity={min_similarity})"
             )
-            
             return buddies
-            
+
         except Exception as e:
             logger.error(f"Error finding book buddies for user {user_id}: {e}")
             return []
+
+    def _upsert_connection(
+        self,
+        user_id: UUID,
+        buddy_id: UUID,
+        compatibility_score: float,
+        shared_books: int,
+        shared_genres: int,
+        status: str,
+    ) -> None:
+        """
+        Insert or update a UserConnection row.
+        Never downgrades a 'connected' record back to 'suggested'.
+        Never overwrites a 'blocked' record.
+        """
+        existing = (
+            self.db.query(UserConnection)
+            .filter(
+                or_(
+                    and_(UserConnection.user_id == user_id, UserConnection.buddy_id == buddy_id),
+                    and_(UserConnection.user_id == buddy_id, UserConnection.buddy_id == user_id),
+                )
+            )
+            .first()
+        )
+        if existing:
+            # Only update metadata if not already connected/blocked
+            if existing.status not in ("connected", "blocked"):
+                existing.status = status
+                existing.compatibility_score = compatibility_score
+                existing.shared_books = shared_books
+                existing.shared_genres = shared_genres
+        else:
+            self.db.add(UserConnection(
+                user_id=user_id,
+                buddy_id=buddy_id,
+                compatibility_score=compatibility_score,
+                shared_books=shared_books,
+                shared_genres=shared_genres,
+                status=status,
+            ))
     
     def get_shared_interests(
         self,
@@ -214,21 +292,46 @@ class SocialService:
                         "genres": book.genres
                     })
             
-            # Find shared genres
-            user_genres = set()
-            buddy_genres = set()
-            
-            for interaction in user_interactions:
-                book = self.db.query(Book).filter(Book.id == interaction.book_id).first()
-                if book and book.genres:
-                    user_genres.update(book.genres)
-            
-            for interaction in buddy_interactions:
-                book = self.db.query(Book).filter(Book.id == interaction.book_id).first()
-                if book and book.genres:
-                    buddy_genres.update(book.genres)
-            
-            shared_genres = list(user_genres & buddy_genres)
+            # Find shared genres — each book.genres element may be a comma-separated
+            # string (e.g. "Fiction, Fantasy, Adventure"), so we split and strip.
+            def _extract_genres(books):
+                genres = set()
+                for b in books:
+                    for g_str in (b.genres or []):
+                        for part in g_str.split(","):
+                            t = part.strip()
+                            if t:
+                                genres.add(t)
+                return genres
+
+            user_books_all = (
+                self.db.query(Book)
+                .join(UserInteraction, Book.id == UserInteraction.book_id)
+                .filter(UserInteraction.user_id == user_id)
+                .all()
+            )
+            buddy_books_all = (
+                self.db.query(Book)
+                .join(UserInteraction, Book.id == UserInteraction.book_id)
+                .filter(UserInteraction.user_id == buddy_id)
+                .all()
+            )
+
+            user_genres = _extract_genres(user_books_all)
+            buddy_genres = _extract_genres(buddy_books_all)
+
+            # Count how many times each shared genre appears across both users' books
+            # (more appearances = more important shared interest)
+            shared_set = user_genres & buddy_genres
+            genre_counts: dict[str, int] = {}
+            for b in user_books_all + buddy_books_all:
+                for g_str in (b.genres or []):
+                    for part in g_str.split(","):
+                        t = part.strip()
+                        if t in shared_set:
+                            genre_counts[t] = genre_counts.get(t, 0) + 1
+
+            shared_genres = sorted(shared_set, key=lambda g: genre_counts.get(g, 0), reverse=True)
             
             return {
                 "shared_books": shared_books,
@@ -317,6 +420,110 @@ class SocialService:
             logger.error(f"Error getting buddy recommendations: {e}")
             return []
     
+    def get_my_connections(
+        self,
+        user_id: UUID,
+        status: Optional[str] = "connected"
+    ) -> List[Dict[str, Any]]:
+        """
+        Return all connections for a user filtered by status.
+        Works bidirectionally (user may appear in either user_id or buddy_id).
+        """
+        try:
+            rows = (
+                self.db.query(UserConnection)
+                .filter(
+                    or_(
+                        UserConnection.user_id == user_id,
+                        UserConnection.buddy_id == user_id,
+                    ),
+                    UserConnection.status == status,
+                )
+                .all()
+            )
+
+            results = []
+            for conn in rows:
+                other_id = conn.buddy_id if conn.user_id == user_id else conn.user_id
+                other = self.db.query(User).filter(User.id == other_id).first()
+                if not other:
+                    continue
+                interaction_count = (
+                    self.db.query(UserInteraction)
+                    .filter(UserInteraction.user_id == other_id)
+                    .count()
+                )
+                results.append({
+                    "connection_id": conn.id,
+                    "user_id": other.id,
+                    "email": other.email,
+                    "full_name": other.full_name,
+                    "compatibility_score": round(conn.compatibility_score, 3),
+                    "shared_books": conn.shared_books,
+                    "shared_genres_count": conn.shared_genres,
+                    "total_interactions": interaction_count,
+                    "status": conn.status,
+                    "connected_at": conn.updated_at,
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching connections for user {user_id}: {e}")
+            return []
+
+    def block_user(
+        self,
+        user_id: UUID,
+        buddy_id: UUID
+    ) -> Optional[UserConnection]:
+        """
+        Block a user. Creates or updates the connection row with status='blocked'.
+        """
+        try:
+            existing = (
+                self.db.query(UserConnection)
+                .filter(
+                    or_(
+                        and_(UserConnection.user_id == user_id, UserConnection.buddy_id == buddy_id),
+                        and_(UserConnection.user_id == buddy_id, UserConnection.buddy_id == user_id),
+                    )
+                )
+                .first()
+            )
+            if existing:
+                existing.status = "blocked"
+                # Normalise direction so blocker is always user_id
+                existing.user_id = user_id
+                existing.buddy_id = buddy_id
+                self.db.commit()
+                self.db.refresh(existing)
+                return existing
+
+            user = self.db.query(User).filter(User.id == user_id).first()
+            buddy = self.db.query(User).filter(User.id == buddy_id).first()
+            if not user or not buddy:
+                return None
+
+            similarity = self.calculate_user_similarity(user, buddy)
+            shared = self.get_shared_interests(user_id, buddy_id)
+
+            conn = UserConnection(
+                user_id=user_id,
+                buddy_id=buddy_id,
+                compatibility_score=similarity,
+                shared_books=shared["shared_books_count"],
+                shared_genres=shared["shared_genres_count"],
+                status="blocked",
+            )
+            self.db.add(conn)
+            self.db.commit()
+            self.db.refresh(conn)
+            logger.info(f"User {user_id} blocked {buddy_id}")
+            return conn
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error blocking user {buddy_id} by {user_id}: {e}")
+            return None
+
     def create_connection(
         self,
         user_id: UUID,

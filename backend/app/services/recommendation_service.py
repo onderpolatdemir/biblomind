@@ -1,6 +1,7 @@
 """Recommendation service for personalized book suggestions."""
 
 import logging
+import random
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -352,14 +353,20 @@ class RecommendationService:
             # Only include if score is reasonable (or it's a favorite author)
             if content_score > 0.5 or is_fav_author:
                 explanation = self._generate_rule_based_explanation(book, user_prefs, content_score=float(content_score))
+                jitter = random.uniform(-0.04, 0.04)
+                final = round(max(0.0, min(1.0, float(content_score) + jitter)), 3)
+                
                 recommendations.append({
                     "book": self._format_book(book),
-                    "score": round(float(content_score), 3),
+                    "score": final,
                     "match_reasons": ["content_similarity"],
                     "explanation": explanation
                 })
-        
-        # Sort by boosted score and take top limit
+
+                if len(recommendations) >= limit * 2:
+                    break
+
+        # Re-sort after jitter so overall quality ordering is preserved
         recommendations.sort(key=lambda x: x["score"], reverse=True)
         return recommendations[:limit]
     
@@ -470,7 +477,12 @@ class RecommendationService:
                 }
             })
         
-        # Sort by final score and return top N
+        # Add small random jitter so order varies between calls while
+        # still favouring high-scoring books (jitter ±5% of score range)
+        for rec in recommendations:
+            rec["score"] += random.uniform(-0.05, 0.05)
+            rec["score"] = round(max(0.0, min(1.0, rec["score"])), 3)
+
         recommendations.sort(key=lambda x: x["score"], reverse=True)
         return recommendations[:limit]
     
@@ -494,6 +506,9 @@ class RecommendationService:
             # We will collect multiple query results to ensure we get user's favorites
             candidates_dict = {}  # book_id -> {book, interaction_count, score_boost}
             
+            # Fetch a larger pool so we can randomly sample from it if needed
+            pool_size = max(limit * 4, 40)
+            
             # Helper to run a query and add results
             def _add_to_candidates(base_query, boost_score):
                 if excluded_book_ids:
@@ -501,7 +516,7 @@ class RecommendationService:
                     
                 results = base_query.group_by(Book.id).order_by(
                     func.count(UserInteraction.id).desc()
-                ).limit(limit * 2).all()
+                ).limit(pool_size).all()
                 
                 for book, count in results:
                     if book.id not in candidates_dict:
@@ -533,16 +548,35 @@ class RecommendationService:
             ).filter(Book.stock > 0)
             _add_to_candidates(q_popular, boost_score=0)
 
-            # Sort combined results by (boost + count)
-            sorted_candidates = sorted(
-                candidates_dict.values(),
-                key=lambda x: x["boost"] + x["count"],
-                reverse=True
-            )[:limit]
+            pool = list(candidates_dict.values())
             
+            # Weighted random sample: more-popular books are more likely to appear
+            # but order is never deterministic
+            if len(pool) <= limit:
+                selected = pool
+            else:
+                weights = [max(1, item["count"] + item["boost"]) for item in pool]
+                sampled = random.choices(pool, weights=weights, k=limit * 2)
+                # Deduplicate while preserving weighted randomness
+                seen_ids = set()
+                unique_selected = []
+                for item in sampled:
+                    bid = item["book"].id
+                    if bid not in seen_ids:
+                        seen_ids.add(bid)
+                        unique_selected.append(item)
+                    if len(unique_selected) >= limit:
+                        break
+                # If we still need more, fill from remaining pool
+                if len(unique_selected) < limit:
+                    remaining = [p for p in pool if p["book"].id not in seen_ids]
+                    remaining.sort(key=lambda x: x["boost"] + x["count"], reverse=True)
+                    unique_selected.extend(remaining[:limit - len(unique_selected)])
+                selected = unique_selected
+
             # Format results
             recommendations = []
-            for item in sorted_candidates:
+            for item in selected:
                 book = item["book"]
                 interaction_count = item["count"]
                 is_popular = item["boost"] == 0

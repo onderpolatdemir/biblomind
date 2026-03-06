@@ -128,16 +128,24 @@ async def get_favorites(
 @router.post("/me/favorites/{book_id}", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def add_to_favorites(
     book_id: UUID,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Add a book to favorites.
     
-    Creates a 'like' interaction for the book.
+    Creates a 'like' interaction for the book and triggers a background
+    preference-vector update so recommendations stay fresh.
     If already favorited, returns the book without error.
     """
     book = UserService.add_to_favorites(db, current_user.id, book_id)
+    # Update preference vector in background (same pattern as /me/interactions)
+    background_tasks.add_task(
+        _update_user_vector_background,
+        db=db,
+        user_id=current_user.id,
+    )
     return book
 
 

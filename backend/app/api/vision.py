@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.shelf_analysis import ShelfAnalysis
+from app.models.photo_scan import PhotoScan
 from app.services.vision_service import VisionService
 from app.services.openai_service import OpenAIService
 from app.services.user_service import UserService
@@ -21,100 +22,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vision", tags=["vision"])
 
 
-@router.post("/test", response_model=Dict[str, Any])
-async def test_vision_ocr(
-    file: UploadFile = File(..., description="Image file (JPG/PNG, max 10MB)"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Test endpoint for Vision API OCR.
-    
-    Upload a bookshelf image and get:
-    - Detected texts (OCR results)
-    - Matched books from database
-    - Similarity scores
-    
-    **Authentication required.**
-    
-    **Image requirements:**
-    - Format: JPG or PNG
-    - Max size: 10MB
-    - Recommended: Clear, well-lit bookshelf photo
-    
-    **Example Response:**
-    ```json
-    {
-      "detected_texts": ["1984", "George Orwell", "Brave New World"],
-      "matched_books": [
-        {
-          "id": "...",
-          "title": "1984",
-          "author": "George Orwell",
-          "similarity_score": 0.95
-        }
-      ],
-      "total_detected": 3,
-      "total_matched": 1,
-      "processing_time_ms": 3500
-    }
-    ```
-    """
-    import time
-    start_time = time.time()
-    
-    # Validate file type
-    if file.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG supported."
-        )
-    
-    try:
-        # Read file
-        image_bytes = await file.read()
-        
-        logger.info(
-            f"Vision OCR test request from user {current_user.id}: "
-            f"{file.filename} ({len(image_bytes)} bytes)"
-        )
-        
-        # Initialize service
-        vision_service = VisionService()
-        
-        # Analyze image
-        result = await vision_service.analyze_bookshelf_image(image_bytes, db)
-        
-        # Calculate processing time
-        processing_time_ms = int((time.time() - start_time) * 1000)
-        result["processing_time_ms"] = processing_time_ms
-        
-        logger.info(
-            f"Vision OCR completed in {processing_time_ms}ms: "
-            f"{result['total_detected']} detected, {result['total_matched']} matched"
-        )
-        
-        return result
-        
-    except ValueError as e:
-        # Image validation errors
-        logger.warning(f"Invalid image: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        # Vision API or other errors
-        logger.error(f"Vision OCR failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Image analysis failed: {str(e)}"
-        )
-
-
 @router.post("/match-shelf", response_model=Dict[str, Any])
 async def match_bookshelf_to_user(
-    file: UploadFile = File(..., description="Bookshelf image (JPG/PNG, max 10MB)"),
+    file: UploadFile = File(..., description="Bookshelf image (JPG/PNG/WEBP, max 10MB)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -171,10 +81,10 @@ async def match_bookshelf_to_user(
     start_time = time.time()
     
     # Validate file type
-    if file.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
+    if file.content_type not in ["image/jpeg", "image/jpg", "image/png", "image/webp"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG supported."
+            detail=f"Invalid file type: {file.content_type}. Only JPG/PNG/WEBP supported."
         )
     
     try:
@@ -245,6 +155,28 @@ async def match_bookshelf_to_user(
         # Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
         
+        # Save scan history to photo_scans table
+        try:
+            photo_scan = PhotoScan(
+                user_id=current_user.id,
+                detected_books=detected_books,
+                recommendations=[
+                    {
+                        "title": r.get("title"),
+                        "match_score": r.get("match_score"),
+                        "in_our_store": r.get("in_our_store", False),
+                        "book_id": r.get("book_id"),
+                    }
+                    for r in matching_result['recommendations']
+                ],
+            )
+            db.add(photo_scan)
+            db.commit()
+            logger.info(f"PhotoScan saved for user {current_user.id}")
+        except Exception as scan_err:
+            db.rollback()
+            logger.warning(f"Failed to save photo scan: {scan_err}")
+
         # Prepare response
         response = {
             "user_profile": user_profile,
@@ -268,12 +200,11 @@ async def match_bookshelf_to_user(
 
         # Include the DB ID in the response so the frontend can redirect to it
         response["analysis_id"] = str(analysis_record.id)
-        
         logger.info(
             f"Bookshelf matching completed in {processing_time_ms}ms: "
             f"{len(detected_books)} detected, {len(matching_result['recommendations'])} recommended"
         )
-        
+
         return response
         
     except ValueError as e:
@@ -338,6 +269,37 @@ async def get_shelf_analysis_detail(
     result["image_path"] = analysis.image_path
     return result
 
+
+
+@router.get("/scans", response_model=List[Dict[str, Any]])
+async def get_scan_history(
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current user's bookshelf scan history.
+
+    Returns all photo scans ordered by newest first,
+    including detected books and recommendations for each scan.
+    """
+    scans = (
+        db.query(PhotoScan)
+        .filter(PhotoScan.user_id == current_user.id)
+        .order_by(PhotoScan.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "id": str(s.id),
+            "detected_books": s.detected_books or [],
+            "recommendations": s.recommendations or [],
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s in scans
+    ]
 
 
 @router.get("/health")

@@ -11,7 +11,7 @@ import ExpandableSearchBar from "@/components/expandable-search-bar";
 import {
     Book, Brain, Rocket, Sparkles, Search, ShoppingCart,
     Ghost, Heart, PenTool, Landmark, FlaskConical, House, LayoutGrid, Info,
-    Leaf, Feather, Baby, User, Scroll, Camera
+    Leaf, Feather, Baby, User, Scroll, Camera, Users, ShoppingBag, LayoutDashboard
 } from "lucide-react";
 import { CATEGORIES } from "@/lib/constants"; // Shared constants
 
@@ -124,13 +124,12 @@ export default function Header() {
                 >
 
 
-                    <div className="hover:text-primary transition-colors py-4 cursor-default">
+                    <Link href="/categories" className="hover:text-primary transition-colors py-4">
                         <div className="flex items-center gap-1">
                             <LayoutGrid />
                             Categories
                         </div>
-
-                    </div>
+                    </Link>
 
 
 
@@ -175,7 +174,12 @@ export default function Header() {
                         <Heart />
                         Favorites
                     </div>
-
+                </Link>
+                <Link href="/book-buddies" className="hover:text-primary transition-colors py-4">
+                    <div className="flex items-center gap-1">
+                        <Users />
+                        Book Buddies
+                    </div>
                 </Link>
                 <Link href="/recommendations" className="hover:text-primary transition-colors py-4">
                     <div className="flex items-center gap-1">
@@ -196,7 +200,7 @@ export default function Header() {
                 <div className="flex items-center gap-2">
                     <ExpandableSearchBar
                         expandDirection="left"
-                        onSearch={(q) => console.log("Search:", q)}
+                        onSearch={(q) => { if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`); }}
                         onQueryChange={handleSearchChange}
                         onResultSelect={handleBookSelect}
                         results={searchResults}
@@ -239,16 +243,24 @@ export default function Header() {
                             exit={{ opacity: 0, y: 10 }}
                             className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 overflow-hidden z-50"
                         >
-                            <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                                Profile
+                            <Link href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                <User size={14} /> Profile
                             </Link>
-                            <Link href="/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                                Settings
+                            <Link href="/orders" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                <ShoppingBag size={14} /> My Orders
                             </Link>
+                            {user?.is_admin && (
+                                <>
+                                    <div className="border-t border-gray-100 my-1"></div>
+                                    <Link href="/admin/dashboard" className="flex items-center gap-2 px-4 py-2 text-sm text-accent font-medium hover:bg-orange-50 transition-colors">
+                                        <LayoutDashboard size={14} /> Admin Panel
+                                    </Link>
+                                </>
+                            )}
                             <div className="border-t border-gray-100 my-1"></div>
                             <button
                                 onClick={handleLogout}
-                                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                             >
                                 Sign Out
                             </button>
@@ -301,6 +313,12 @@ export default function Header() {
                                 <Link href="/shelf-recommendations" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>📸</span> Shelf Match
                                 </Link>
+                                <Link href="/book-buddies" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
+                                    <span>👥</span> Book Buddies
+                                </Link>
+                                <Link href="/orders" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
+                                    <span>📦</span> My Orders
+                                </Link>
                                 <Link href="/cart" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>🛒</span> My Cart
                                 </Link>
@@ -310,6 +328,11 @@ export default function Header() {
                                 <Link href="/checkout" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>💳</span> Checkout
                                 </Link>
+                                {user?.is_admin && (
+                                    <Link href="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-accent font-bold flex items-center gap-3">
+                                        <span>⚙️</span> Admin Panel
+                                    </Link>
+                                )}
                             </nav>
 
                             <div className="mt-auto pt-8 border-t border-gray-100">

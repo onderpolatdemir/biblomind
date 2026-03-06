@@ -32,9 +32,9 @@ def validate_image(image_bytes: bytes, max_size_mb: int = 10) -> bool:
         img = Image.open(io.BytesIO(image_bytes))
         img.verify()
         
-        # Check format
-        if img.format not in ['JPEG', 'PNG', 'JPG']:
-            raise ValueError(f"Unsupported format: {img.format}. Only JPG/PNG supported.")
+        # Check format (WEBP: uzantı .jpeg olsa bile içerik WEBP olabilir)
+        if img.format not in ['JPEG', 'PNG', 'JPG', 'WEBP']:
+            raise ValueError(f"Unsupported format: {img.format}. Only JPG/PNG/WEBP supported.")
         
         logger.debug(f"Image validated: {img.format}, {img.size}, {size_mb:.2f}MB")
         return True

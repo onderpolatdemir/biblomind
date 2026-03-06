@@ -17,7 +17,10 @@ from app.schemas.social import (
     SharedInterestsResponse,
     BuddyRecommendationsResponse,
     BuddyRecommendation,
-    ConnectionResponse
+    ConnectionResponse,
+    MyConnectionsResponse,
+    MyConnectionItem,
+    BlockResponse,
 )
 from app.core.logging import logger
 
@@ -28,7 +31,7 @@ router = APIRouter()
 @router.get("/find-buddies", response_model=BookBuddyListResponse)
 async def find_book_buddies(
     limit: int = Query(10, ge=1, le=50, description="Maximum number of buddies to return"),
-    min_similarity: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity threshold"),
+    min_similarity: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -220,4 +223,81 @@ async def connect_with_buddy(
         shared_genres=connection.shared_genres,
         status=connection.status,
         created_at=connection.created_at
+    )
+
+
+@router.get("/my-connections", response_model=MyConnectionsResponse)
+async def get_my_connections(
+    conn_status: str = Query("connected", alias="status", description="Filter by status: connected, suggested, blocked"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    List current user's connections filtered by status.
+
+    - **connected**: Users you have explicitly connected with
+    - **suggested**: Users auto-discovered by find-buddies (not yet connected)
+    - **blocked**: Users you have blocked
+    """
+    if conn_status not in ("connected", "suggested", "blocked"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="status must be one of: connected, suggested, blocked"
+        )
+
+    service = SocialService(db)
+    connections = service.get_my_connections(user_id=current_user.id, status=conn_status)
+
+    logger.info(
+        f"User {current_user.id} fetched {len(connections)} '{conn_status}' connections"
+    )
+
+    return MyConnectionsResponse(
+        connections=[MyConnectionItem(**c) for c in connections],
+        total=len(connections),
+    )
+
+
+@router.post("/block/{buddy_id}", response_model=BlockResponse, status_code=status.HTTP_200_OK)
+async def block_user(
+    buddy_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Block a user.
+
+    - Creates or updates a UserConnection row with **status='blocked'**
+    - Blocked users will not appear in future find-buddies results
+    - The action is reversible only by manually unblocking (not yet exposed)
+    """
+    if current_user.id == buddy_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot block yourself"
+        )
+
+    buddy = db.query(User).filter(User.id == buddy_id).first()
+    if not buddy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    service = SocialService(db)
+    connection = service.block_user(user_id=current_user.id, buddy_id=buddy_id)
+
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to block user"
+        )
+
+    logger.info(f"User {current_user.id} blocked {buddy_id}")
+
+    return BlockResponse(
+        connection_id=connection.id,
+        blocked_user_id=buddy_id,
+        status="blocked",
+        message=f"User has been blocked successfully",
     )

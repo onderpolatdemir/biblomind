@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import BookCard from "@/components/ui/BookCard";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import { Heart } from "lucide-react";
+import api from "@/lib/api";
 
 interface Book {
     id: string;
@@ -20,37 +21,22 @@ interface Book {
 }
 
 export default function FavoritesPage() {
-    const { user, login } = useAuth(); // login not needed here but destructured for completeness if needed later
+    const { user } = useAuth();
+    const { favorites: favoriteIds } = useFavorites();
     const router = useRouter();
     const [favorites, setFavorites] = useState<Book[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchFavorites = async () => {
-        // Auth check
-        const token = localStorage.getItem("token");
-        if (!token) {
+        if (!user) {
             router.push("/auth/login");
             return;
         }
-
         try {
-            const res = await fetch("http://localhost:8000/api/users/me/favorites", {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setFavorites(data);
-            } else {
-                console.error("Failed to fetch favorites");
-                if (res.status === 401) {
-                    router.push("/auth/login");
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching favorites", error);
+            const res = await api.get("/users/me/favorites");
+            setFavorites(res.data ?? []);
+        } catch {
+            setFavorites([]);
         } finally {
             setIsLoading(false);
         }
@@ -58,7 +44,9 @@ export default function FavoritesPage() {
 
     useEffect(() => {
         fetchFavorites();
-    }, [router]);
+    // favoriteIds değişince (toggle sonrası) listeyi yenile
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, favoriteIds.length]);
 
     if (isLoading) {
         return (

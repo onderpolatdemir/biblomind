@@ -81,3 +81,33 @@ class ConnectionResponse(BaseModel):
     created_at: datetime
     
     model_config = {"from_attributes": True}
+
+
+class MyConnectionItem(BaseModel):
+    """Single entry in my-connections list."""
+    connection_id: UUID4
+    user_id: UUID4
+    email: str
+    full_name: Optional[str] = None
+    compatibility_score: float
+    shared_books: int
+    shared_genres_count: int
+    total_interactions: int
+    status: str
+    connected_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MyConnectionsResponse(BaseModel):
+    """List of current user's connections."""
+    connections: List[MyConnectionItem]
+    total: int
+
+
+class BlockResponse(BaseModel):
+    """Response after blocking a user."""
+    connection_id: UUID4
+    blocked_user_id: UUID4
+    status: str
+    message: str
