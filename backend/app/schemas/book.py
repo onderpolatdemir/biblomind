@@ -64,6 +64,8 @@ class BookResponse(BookBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    rating: Optional[float] = None
+    reviews_count: int = 0
     
     model_config = {
         "from_attributes": True,

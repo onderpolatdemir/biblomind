@@ -7,10 +7,14 @@ from typing import List, Dict, Any
 
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
+from app.models.shelf_analysis import ShelfAnalysis
 from app.services.vision_service import VisionService
 from app.services.openai_service import OpenAIService
 from app.services.user_service import UserService
 from app.core.config import settings
+import os
+import uuid
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +185,19 @@ async def match_bookshelf_to_user(
             f"Bookshelf matching request from user {current_user.id}: "
             f"{file.filename} ({len(image_bytes)} bytes)"
         )
+
+        # Save the file locally for the Gallery
+        file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+        unique_filename = f"{uuid.uuid4()}.{file_ext}"
+        upload_dir = os.path.join("static", "uploads", "shelves")
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, unique_filename)
+        
+        with open(file_path, "wb") as f:
+            f.write(image_bytes)
+
+        # The URL that the frontend will use to access the image
+        image_url = f"/static/uploads/shelves/{unique_filename}"
         
         # Initialize services
         vision_service = VisionService()
@@ -238,6 +255,19 @@ async def match_bookshelf_to_user(
             "message": f"Bu kitaplıktan size {len(matching_result['recommendations'])} kitap öneriyoruz!",
             "processing_time_ms": processing_time_ms
         }
+
+        # Save to ShelfAnalysis DB
+        analysis_record = ShelfAnalysis(
+            user_id=current_user.id,
+            image_path=image_url,
+            result_json=response
+        )
+        db.add(analysis_record)
+        db.commit()
+        db.refresh(analysis_record)
+
+        # Include the DB ID in the response so the frontend can redirect to it
+        response["analysis_id"] = str(analysis_record.id)
         
         logger.info(
             f"Bookshelf matching completed in {processing_time_ms}ms: "
@@ -258,8 +288,56 @@ async def match_bookshelf_to_user(
         logger.error(f"Bookshelf matching failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Kitap eşleştirme başarısız: {str(e)}"
+            detail=f"Image analysis failed: {str(e)}"
         )
+
+@router.get("/shelf-analyses", response_model=List[Dict[str, Any]])
+async def get_user_shelf_analyses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get the history of bookshelf analyses for the current user.
+    """
+    analyses = db.query(ShelfAnalysis).filter(
+        ShelfAnalysis.user_id == current_user.id
+    ).order_by(ShelfAnalysis.created_at.desc()).all()
+
+    # Format the response
+    return [
+        {
+            "id": str(analysis.id),
+            "image_path": analysis.image_path,
+            "created_at": analysis.created_at.isoformat(),
+            "total_books": len(analysis.result_json.get("detected_books", [])),
+            "total_recommendations": len(analysis.result_json.get("recommendations", [])),
+            "shelf_analysis": analysis.result_json.get("shelf_analysis", {})
+        }
+        for analysis in analyses
+    ]
+
+@router.get("/shelf-analyses/{analysis_id}", response_model=Dict[str, Any])
+async def get_shelf_analysis_detail(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get a specific bookshelf analysis detail by ID.
+    """
+    analysis = db.query(ShelfAnalysis).filter(
+        ShelfAnalysis.id == analysis_id,
+        ShelfAnalysis.user_id == current_user.id
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis not found")
+
+    result = analysis.result_json
+    result["analysis_id"] = str(analysis.id)
+    result["image_path"] = analysis.image_path
+    return result
+
 
 
 @router.get("/health")

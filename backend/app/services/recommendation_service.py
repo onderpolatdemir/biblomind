@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.book import Book
 from app.models.user_interaction import UserInteraction
 from app.services.openai_service import OpenAIService
+from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -85,26 +86,44 @@ class RecommendationService:
             has_vector = user.preferences_vector is not None
             
             if not has_vector:
-                logger.info(f"User {user_id} has no preference vector, using fallback")
-                recommendations = await self._get_popular_books(limit, excluded_book_ids)
+                logger.info(f"User {user_id} has no preference vector, attempting to build one...")
+                update_res = await self.update_user_preference_vector(user_id)
+                
+                if update_res.get("vector_updated"):
+                    # Reload user to get the new vector
+                    self.db.refresh(user)
+                    has_vector = user.preferences_vector is not None
+            
+            # Get user preferences for explanations
+            user_prefs = UserService.get_user_preferences(self.db, user_id)
+            
+            if not has_vector:
+                logger.info(f"User {user_id} still has no preference vector, using fallback")
+                
+                # Check if they have ANY interactions even if they don't have embeddings
+                interaction_count = self.db.query(func.count(UserInteraction.id)).filter(
+                    UserInteraction.user_id == user_id
+                ).scalar() or 0
+                
+                recommendations = await self._get_popular_books(limit, excluded_book_ids, user_prefs)
                 return {
                     "recommendations": recommendations,
                     "total": len(recommendations),
                     "strategy": "popular_fallback",
-                    "user_has_history": False,
+                    "user_has_history": interaction_count > 0,
                     "message": "Henüz yeterli veriye sahip değiliz, size popüler kitapları öneriyoruz!"
                 }
             
             # Generate recommendations based on strategy
             if strategy == "popular":
-                recommendations = await self._get_popular_books(limit, excluded_book_ids)
+                recommendations = await self._get_popular_books(limit, excluded_book_ids, user_prefs)
             elif strategy == "content":
                 recommendations = await self._get_content_based_recommendations(
-                    user, limit, excluded_book_ids
+                    user, limit, excluded_book_ids, user_prefs
                 )
             else:  # hybrid (default)
                 recommendations = await self._get_hybrid_recommendations(
-                    user, limit, excluded_book_ids
+                    user, limit, excluded_book_ids, user_prefs
                 )
             
             # Generate explanations for top recommendations (optional, can be slow)
@@ -305,32 +324,51 @@ class RecommendationService:
         if excluded_book_ids:
             query = query.filter(Book.id.notin_(excluded_book_ids))
         
-        results = query.order_by('distance').limit(limit * 2).all()  # Get more for filtering
+        # Increase candidate pool to find more diverse matches (author/genre)
+        results = query.order_by('distance').limit(limit * 10).all()
         
         # Format results
         recommendations = []
         for book, distance in results:
             content_score = 1 - distance  # Convert distance to similarity
             
-            # Only include if score is reasonable
-            if content_score > 0.5:
+            # Boost score based on explicit user preferences
+            is_fav_author = False
+            if user_prefs:
+                fav_authors = user_prefs.get('favorite_authors', [])
+                fav_genres = user_prefs.get('favorite_genres', [])
+                
+                if book.author and book.author in fav_authors:
+                    content_score += 0.4  # Massive boost for favorite author
+                    is_fav_author = True
+                    
+                if book.genres:
+                    matching_genres = [g for g in book.genres if g in fav_genres]
+                    if matching_genres:
+                        content_score += 0.15  # Moderate boost for favorite genre
+
+            content_score = min(1.0, content_score)
+            
+            # Only include if score is reasonable (or it's a favorite author)
+            if content_score > 0.5 or is_fav_author:
+                explanation = self._generate_rule_based_explanation(book, user_prefs, content_score=float(content_score))
                 recommendations.append({
                     "book": self._format_book(book),
                     "score": round(float(content_score), 3),
                     "match_reasons": ["content_similarity"],
-                    "explanation": ""  # Will be filled later
+                    "explanation": explanation
                 })
-                
-                if len(recommendations) >= limit:
-                    break
         
-        return recommendations
+        # Sort by boosted score and take top limit
+        recommendations.sort(key=lambda x: x["score"], reverse=True)
+        return recommendations[:limit]
     
     async def _get_hybrid_recommendations(
         self,
         user: User,
         limit: int,
-        excluded_book_ids: List[UUID]
+        excluded_book_ids: List[UUID],
+        user_prefs: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """
         Get hybrid recommendations (content + popularity + recency).
@@ -357,15 +395,32 @@ class RecommendationService:
         if excluded_book_ids:
             candidates_query = candidates_query.filter(Book.id.notin_(excluded_book_ids))
         
-        candidates = candidates_query.limit(limit * 3).all()  # Get more candidates
+        # Pulling more candidates ensures we can find authors even if baseline similarity is lower
+        candidates = candidates_query.limit(limit * 10).all()
         
         # Calculate hybrid scores
         recommendations = []
         for book, distance in candidates:
             content_score = 1 - distance
             
-            # Skip low content similarity
-            if content_score < 0.4:
+            # Boost score based on explicit user preferences
+            is_fav_author = False
+            if user_prefs:
+                fav_authors = user_prefs.get('favorite_authors', [])
+                fav_genres = user_prefs.get('favorite_genres', [])
+                
+                if book.author and book.author in fav_authors:
+                    content_score += 0.4  # Huge boost
+                    is_fav_author = True
+                if book.genres:
+                    matching_genres = [g for g in book.genres if g in fav_genres]
+                    if matching_genres:
+                        content_score += 0.15  # Moderate boost
+            
+            content_score = min(1.0, content_score)
+            
+            # Skip low content similarity unless it's a favorite author match
+            if content_score < 0.4 and not is_fav_author:
                 continue
             
             # Calculate popularity score (based on interactions)
@@ -398,12 +453,16 @@ class RecommendationService:
                 match_reasons.append("popular")
             if recency_score > 0.7:
                 match_reasons.append("new_release")
+            if is_fav_author:
+                match_reasons.append("favorite_author")
             
+            explanation = self._generate_rule_based_explanation(book, user_prefs, content_score=float(content_score))
+                
             recommendations.append({
                 "book": self._format_book(book),
                 "score": round(float(final_score), 3),
                 "match_reasons": match_reasons,
-                "explanation": "",
+                "explanation": explanation,
                 "_debug": {
                     "content_score": round(float(content_score), 3),
                     "popularity_score": round(float(popularity_score), 3),
@@ -418,7 +477,8 @@ class RecommendationService:
     async def _get_popular_books(
         self,
         limit: int,
-        excluded_book_ids: List[UUID]
+        excluded_book_ids: List[UUID],
+        user_prefs: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """
         Get popular books as fallback for new users.
@@ -430,34 +490,88 @@ class RecommendationService:
         Returns:
             List of recommendation dicts
         """
-        # Query most popular books (by interaction count)
-        query = self.db.query(
-            Book,
-            func.count(UserInteraction.id).label('interaction_count')
-        ).outerjoin(
-            UserInteraction, Book.id == UserInteraction.book_id
-        ).filter(
-            Book.stock > 0
-        ).group_by(Book.id)
-        
-        if excluded_book_ids:
-            query = query.filter(Book.id.notin_(excluded_book_ids))
-        
-        popular_books = query.order_by(
-            func.count(UserInteraction.id).desc()
-        ).limit(limit).all()
-        
-        # Format results
-        recommendations = []
-        for book, interaction_count in popular_books:
-            recommendations.append({
-                "book": self._format_book(book),
-                "score": 0.8,  # Default score for popular books
-                "match_reasons": ["popular"],
-                "explanation": f"Bu kitap platformumuzda çok beğeniliyor! {interaction_count} etkileşim."
-            })
-        
-        return recommendations
+        try:
+            # We will collect multiple query results to ensure we get user's favorites
+            candidates_dict = {}  # book_id -> {book, interaction_count, score_boost}
+            
+            # Helper to run a query and add results
+            def _add_to_candidates(base_query, boost_score):
+                if excluded_book_ids:
+                    base_query = base_query.filter(Book.id.notin_(excluded_book_ids))
+                    
+                results = base_query.group_by(Book.id).order_by(
+                    func.count(UserInteraction.id).desc()
+                ).limit(limit * 2).all()
+                
+                for book, count in results:
+                    if book.id not in candidates_dict:
+                        candidates_dict[book.id] = {"book": book, "count": count, "boost": boost_score}
+                    else:
+                        candidates_dict[book.id]["boost"] = max(candidates_dict[book.id]["boost"], boost_score)
+
+            # 1. Fetch by favorite authors
+            fav_authors = user_prefs.get('favorite_authors', []) if user_prefs else []
+            if fav_authors:
+                q_authors = self.db.query(Book, func.count(UserInteraction.id).label('ic')).outerjoin(
+                    UserInteraction, Book.id == UserInteraction.book_id
+                ).filter(Book.stock > 0, Book.author.in_(fav_authors))
+                _add_to_candidates(q_authors, boost_score=100)
+                
+            # 2. Fetch by favorite genres
+            fav_genres = user_prefs.get('favorite_genres', []) if user_prefs else []
+            if fav_genres:
+                for g in fav_genres[:2]:
+                    from sqlalchemy import cast, String
+                    q_genres = self.db.query(Book, func.count(UserInteraction.id).label('ic')).outerjoin(
+                        UserInteraction, Book.id == UserInteraction.book_id
+                    ).filter(Book.stock > 0, cast(Book.genres, String).ilike(f'%{g}%'))
+                    _add_to_candidates(q_genres, boost_score=50)
+
+            # 3. Fetch globally popular books
+            q_popular = self.db.query(Book, func.count(UserInteraction.id).label('ic')).outerjoin(
+                UserInteraction, Book.id == UserInteraction.book_id
+            ).filter(Book.stock > 0)
+            _add_to_candidates(q_popular, boost_score=0)
+
+            # Sort combined results by (boost + count)
+            sorted_candidates = sorted(
+                candidates_dict.values(),
+                key=lambda x: x["boost"] + x["count"],
+                reverse=True
+            )[:limit]
+            
+            # Format results
+            recommendations = []
+            for item in sorted_candidates:
+                book = item["book"]
+                interaction_count = item["count"]
+                is_popular = item["boost"] == 0
+                
+                explanation = self._generate_rule_based_explanation(book, user_prefs, is_popular=is_popular, interaction_count=interaction_count)
+                recommendations.append({
+                    "book": self._format_book(book),
+                    "score": 0.8 + (item["boost"] / 1000.0),
+                    "match_reasons": ["favorite_author"] if item["boost"] == 100 else (["favorite_genre"] if item["boost"] == 50 else ["popular"]),
+                    "explanation": explanation
+                })
+            
+            return recommendations
+        except Exception as e:
+            return [{
+                "book": {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "title": "ERROR: " + str(e),
+                    "author": "System",
+                    "price": 0.0,
+                    "stock": 0,
+                    "cover_url": "",
+                    "genres": [],
+                    "description": ""
+                },
+                "score": 0.0,
+                "match_reasons": ["error"],
+                "explanation": "Debugging error detail"
+            }]
     
     def _calculate_hybrid_score(
         self,
@@ -502,6 +616,80 @@ class RecommendationService:
             "genres": book.genres or [],
             "description": book.description[:200] if book.description else None
         }
+
+    def _generate_rule_based_explanation(self, book: Book, user_prefs: Dict[str, Any] = None, content_score: float = 0.0, is_popular: bool = False, interaction_count: int = 0) -> str:
+        """
+        Generates a personalized text explanation for a recommendation without requiring an LLM call per book.
+        Uses randomized templates for natural variety.
+        """
+        import random
+        
+        if user_prefs:
+            fav_authors = user_prefs.get('favorite_authors', [])
+            fav_genres = user_prefs.get('favorite_genres', [])
+            
+            # 1. Author Match (Strongest explicit match)
+            if book.author and book.author in fav_authors:
+                templates = [
+                    f"Daha önce etkileşime girdiğiniz yazar '{book.author}' kaleminden çıktığı için öneriliyor.",
+                    f"Kitaplığınızda '{book.author}' eserleri bulunduğu için bu kitabı da çok sevebilirsiniz.",
+                    f"Favori yazarlarınızdan biri olan '{book.author}' imzalı bu eser tam size göre."
+                ]
+                return random.choice(templates)
+            
+            # 2. Genre Match
+            if book.genres:
+                matching_genres = [g for g in book.genres if g in fav_genres]
+                if matching_genres:
+                    genre_str = matching_genres[0]
+                    templates = [
+                        f"İlginizi çeken '{genre_str}' türünde popüler bir eser olduğu için sizin için seçtik.",
+                        f"Kütüphanenizdeki diğer '{genre_str}' kitaplarına harika bir alternatif.",
+                        f"Favorileriniz arasında '{genre_str}' türü öne çıkıyor, bu kitap beklentinizi karşılayabilir.",
+                        f"Geçmiş siparişlerinize dayanarak '{genre_str}' kategorisinden bir solukta okuyacağınız bir öneri."
+                    ]
+                    return random.choice(templates)
+
+        # 3. High Content Similarity fallback
+        if content_score > 0.85:
+            templates = [
+                "Okuma geçmişiniz ve favori kitaplarınızın tarzıyla %90'ın üzerinde yüksek bir uyum yakaladık!",
+                "Kitap zevkinizle neredeyse birebir örtüşen, kesinlikle şans vermeniz gereken bir kitap.",
+                "Algoritmamız bu kitabın okuma profilinizle mükemmel bir eşleşme sağladığını söylüyor."
+            ]
+            return random.choice(templates)
+            
+        elif content_score > 0.65:
+            templates = [
+                "Geçmişte incelediğiniz kitaplarla benzer temalar içerdiği için beğeneceğinizi düşünüyoruz.",
+                "Son zamanlarda ilgi gösterdiğiniz kitapların kurgusuyla paralellik gösteriyor.",
+                "Profilinize göre bu kitap tarzınıza oldukça yakın görünüyor."
+            ]
+            return random.choice(templates)
+            
+        # 4. Pure Popularity fallback
+        if is_popular:
+            if interaction_count > 5:
+                templates = [
+                    f"Platformdaki favori kitaplardan biri. {interaction_count} okurumuz tarafından tercih edildi!",
+                    f"Şu sıralar çok popüler! Okurlarımız bu kitaba yoğun ilgi gösteriyor.",
+                    f"Kapsamlı okur kitlemiz tarafından onaylanmış, çok satanlar listesinde bir eser."
+                ]
+                return random.choice(templates)
+            else:
+                templates = [
+                    "Platformumuzdaki dikkat çeken, yeni parlayan eserlerden biri.",
+                    "Okurlarımızın kitaplıklarına eklemeye başladığı popüler bir kitap.",
+                    "Genel okuyucu kitlesinin ilgisini çeken başarılı bir yapıt."
+                ]
+                return random.choice(templates)
+            
+        templates = [
+            "Okuma tarzınıza uygun olabileceğini düşündüğümüz için önerdik.",
+            "Geniş algoritmamız sizin için bu kitabı seçti, bir göz Atmada fayda var!",
+            "Koleksiyonunuza renk katacağını düşündüğümüz özel bir seçim."
+        ]
+        return random.choice(templates)
     
     async def _generate_explanation(
         self,

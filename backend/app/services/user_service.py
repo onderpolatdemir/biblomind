@@ -218,6 +218,12 @@ class UserService:
         )
         
         db.add(interaction)
+        
+        # Reset preference vector to force dynamic regeneration
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.preferences_vector = None
+            
         db.commit()
         db.refresh(interaction)
         
@@ -297,6 +303,12 @@ class UserService:
         
         if interaction:
             db.delete(interaction)
+            
+            # Reset preference vector to force dynamic regeneration
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                user.preferences_vector = None
+                
             db.commit()
             return True
         

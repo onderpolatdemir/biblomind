@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Header from "@/components/layout/Header";
@@ -8,6 +8,7 @@ import BookCard from "@/components/ui/BookCard";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { CATEGORIES } from "@/lib/constants"; // Shared constants
+import LoadingGame from "@/components/ui/LoadingGame";
 
 type Book = {
     id: string;
@@ -15,6 +16,8 @@ type Book = {
     author: string;
     price: number;
     cover_url: string;
+    rating?: number;
+    reviews_count?: number;
     // Add other fields as needed
 };
 
@@ -22,7 +25,7 @@ export default function HomePage() {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
+    const [uploadStatus, setUploadStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
     const [books, setBooks] = useState<Book[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -42,7 +45,7 @@ export default function HomePage() {
         fetchBooks();
     }, []);
 
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
             if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
@@ -52,11 +55,36 @@ export default function HomePage() {
 
             const imageUrl = URL.createObjectURL(file);
             setSelectedImage(imageUrl);
+            setUploadStatus("loading");
 
-            // Mock Upload Process
-            setTimeout(() => {
+            // Real API Call to Vision Model
+            try {
+                const formData = new FormData();
+                formData.append("file", file);
+
+                const response = await api.post("/vision/vision/match-shelf", formData, {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                    timeout: 60000, // Important: Allow long timeout since vision analysis takes 10+ seconds
+                });
+
                 setUploadStatus("success");
-            }, 1500);
+
+                // Navigate to the specific analysis recommendation page or fallback to gallery
+                setTimeout(() => {
+                    if (response.data.analysis_id) {
+                        router.push(`/shelf-recommendations/${response.data.analysis_id}`);
+                    } else {
+                        router.push("/shelf-recommendations");
+                    }
+                }, 1000); // Give user a moment to see "Success" and final score
+
+            } catch (error: any) {
+                console.error("Failed to analyze bookshelf:", error);
+                setUploadStatus("error");
+                alert(error.response?.data?.detail || "Failed to analyze your bookshelf. Please try again.");
+            }
         }
     };
 
@@ -71,94 +99,90 @@ export default function HomePage() {
         }
     };
 
+    // Now update the JSX to show the game conditionally:
     return (
         <div className="min-h-screen bg-background flex flex-col font-body">
             <Header />
 
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-12">
 
-                {/* Hero / Upload Container */}
+                {/* Hero / Upload Container / Game Container */}
                 <motion.section
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
-                    className="relative bg-secondary/30 rounded-[3rem] p-8 md:p-16 mb-24 overflow-hidden"
+                    className="relative bg-secondary/30 rounded-[3rem] p-8 md:p-16 mb-24 overflow-hidden min-h-[500px] flex items-center justify-center"
                 >
-                    <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
+                    <AnimatePresence mode="wait">
+                        {uploadStatus === "loading" ? (
+                            <motion.div
+                                key="game"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="w-full h-full relative z-20"
+                            >
+                                <LoadingGame />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="hero"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="flex flex-col md:flex-row items-center gap-12 relative z-10 w-full"
+                            >
+                                {/* Left Content */}
+                                <div className="flex-1 text-center md:text-left">
+                                    <h1 className="text-4xl md:text-6xl font-heading font-bold text-text mb-6 leading-tight">
+                                        Let's see if we know <br /> you well enough?
+                                    </h1>
+                                    <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-xl leading-relaxed">
+                                        Confused about what to read? Upload a photo of your bookshelf and let us show you what you might love.
+                                    </p>
 
-                        {/* Left Content */}
-                        <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-4xl md:text-6xl font-heading font-bold text-text mb-6 leading-tight">
-                                Let's see if we know <br /> you well enough?
-                            </h1>
-                            <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-xl leading-relaxed">
-                                Confused about what to read? Upload a photo of your bookshelf and let us show you what you might love.
-                            </p>
+                                    <div className="flex flex-col md:flex-row items-center gap-6">
+                                        <button
+                                            onClick={triggerFileUpload}
+                                            className="group relative flex items-center gap-3 bg-text text-white px-8 py-4 rounded-full font-bold hover:bg-accent transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1 z-20"
+                                            disabled={uploadStatus === "success"}
+                                        >
+                                            <span className="text-2xl">📷</span>
+                                            <span>{uploadStatus === "success" ? "Redirecting..." : "Upload a Bookshelf"}</span>
+                                        </button>
 
-                            <div className="flex flex-col md:flex-row items-center gap-6">
-                                <button
-                                    onClick={triggerFileUpload}
-                                    className="group relative flex items-center gap-3 bg-text text-white px-8 py-4 rounded-full font-bold hover:bg-accent transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-                                >
-                                    <span className="text-2xl">📷</span>
-                                    <span>Upload a Bookshelf</span>
-                                </button>
+                                        <input
+                                            type="file"
+                                            accept=".png,.jpg,.jpeg"
+                                            hidden
+                                            ref={fileInputRef}
+                                            onChange={handleFileSelect}
+                                        />
 
-                                <input
-                                    type="file"
-                                    accept=".png,.jpg,.jpeg"
-                                    hidden
-                                    ref={fileInputRef}
-                                    onChange={handleFileSelect}
-                                />
-
-                                {/* Upload Preview & Status */}
-                                {selectedImage && (
-                                    <motion.div
-                                        initial={{ scale: 0, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-white shadow-md"
-                                    >
-                                        <Image src={selectedImage} alt="Preview" fill className="object-cover" />
-                                        {uploadStatus === 'success' && (
-                                            <div className="absolute inset-0 bg-green-500/50 flex items-center justify-center text-white font-bold text-xs">
-                                                ✓
-                                            </div>
+                                        {/* Error Status */}
+                                        {uploadStatus === 'error' && (
+                                            <p className="mt-4 text-red-600 font-medium">Failed to analyze image. Try again.</p>
                                         )}
-                                    </motion.div>
-                                )}
-                            </div>
+                                    </div>
+                                </div>
 
-                            {/* Success Message Text */}
-                            {uploadStatus === 'success' && (
-                                <motion.p
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="mt-4 text-green-700 font-medium"
-                                >
-                                    Upload successful! Analyzing your library...
-                                </motion.p>
-                            )}
-                        </div>
-
-                        {/* Right Visual (Arched Images) */}
-                        <div className="flex-1 w-full flex justify-center md:justify-end gap-4 relative h-80 md:h-96 items-end">
-                            {/* Decorative Arches */}
-                            <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8">
-                                <Image src="/lotr.png" alt="Book 1" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
-                            </div>
-                            <div className="relative w-40 h-72 md:w-48 md:h-96 bg-white rounded-t-full shadow-2xl overflow-hidden z-10 -ml-8 border-4 border-secondary">
-                                <Image src="/nutuk.png" alt="Book 2" fill className="object-cover hover:scale-105 transition-transform duration-500" />
-                            </div>
-                            <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8 -ml-8">
-                                <Image src="/hp.png" alt="Book 3" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
-                            </div>
-                        </div>
-                    </div>
+                                {/* Right Visual (Arched Images) */}
+                                <div className="flex-1 w-full flex justify-center md:justify-end gap-4 relative h-80 md:h-96 items-end">
+                                    {/* Decorative Arches */}
+                                    <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8">
+                                        <Image src="/lotr.png" alt="Book 1" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                    <div className="relative w-40 h-72 md:w-48 md:h-96 bg-white rounded-t-full shadow-2xl overflow-hidden z-10 -ml-8 border-4 border-secondary">
+                                        <Image src="/nutuk.png" alt="Book 2" fill className="object-cover hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                    <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8 -ml-8">
+                                        <Image src="/hp.png" alt="Book 3" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </motion.section>
-
-
-
 
             </main>
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-32 py-5" >
@@ -186,7 +210,8 @@ export default function HomePage() {
                                     id={book.id}
                                     title={book.title}
                                     author={book.author || "Unknown Author"}
-                                    rating={4.5} // Default rating if not available in this endpoint yet
+                                    rating={book.rating}
+                                    reviews_count={book.reviews_count}
                                     price={Number(book.price)}
                                     imageSrc={book.cover_url || "/hp.png"} // Fallback image
                                 />

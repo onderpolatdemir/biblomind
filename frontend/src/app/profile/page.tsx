@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import ProfileInfo from "@/components/profile/ProfileInfo";
 import AddressManager from "@/components/profile/AddressManager";
 import OrderHistory from "@/components/profile/OrderHistory";
+import ReviewHistory from "@/components/profile/ReviewHistory";
 import {
     User as UserIcon,
     MapPin,
@@ -30,17 +31,7 @@ export default function ProfilePage() {
         }
     };
 
-    // Placeholder for Review History
-    const ReviewsPlaceholder = () => (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-            <Star className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-800 mb-2">My Reviews</h3>
-            <p className="text-gray-500">You haven't written any reviews yet.</p>
-            <button className="mt-6 px-6 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary/20 transition-all">
-                Start Reading
-            </button>
-        </div>
-    );
+
 
     if (!user) {
         return (
@@ -87,8 +78,8 @@ export default function ProfilePage() {
                                         key={item.id}
                                         onClick={() => setActiveTab(item.id as any)}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-                                                ? "bg-primary text-white font-bold shadow-md"
-                                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                            ? "bg-primary text-white font-bold shadow-md"
+                                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                                             }`}
                                     >
                                         <item.icon size={18} />
@@ -136,7 +127,7 @@ export default function ProfilePage() {
                             )}
                             {activeTab === "address" && <AddressManager />}
                             {activeTab === "orders" && <OrderHistory />}
-                            {activeTab === "reviews" && <ReviewsPlaceholder />}
+                            {activeTab === "reviews" && <ReviewHistory />}
                         </motion.div>
                     </div>
                 </div>

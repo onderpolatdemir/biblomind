@@ -1,7 +1,7 @@
 """Book service for CRUD operations and business logic."""
 
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_, or_, func
 from uuid import UUID
 import math
@@ -81,6 +81,9 @@ class BookService:
             query = query.order_by(sort_column.asc())
         else:
             query = query.order_by(sort_column.desc())
+            
+        # Eager load reviews
+        query = query.options(selectinload(Book.reviews))
         
         # Apply pagination
         offset = (page - 1) * page_size
@@ -100,7 +103,7 @@ class BookService:
         Returns:
             Book object or None if not found
         """
-        return db.query(Book).filter(Book.id == book_id).first()
+        return db.query(Book).options(selectinload(Book.reviews)).filter(Book.id == book_id).first()
     
     @staticmethod
     def create_book(db: Session, book_data: BookCreate) -> Book:
