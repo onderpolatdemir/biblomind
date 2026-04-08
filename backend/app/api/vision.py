@@ -19,7 +19,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/vision", tags=["vision"])
+router = APIRouter(tags=["vision"])
 
 
 @router.post("/match-shelf", response_model=Dict[str, Any])
