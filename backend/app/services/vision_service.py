@@ -43,7 +43,8 @@ class VisionService:
     async def detect_text_from_image(
         self,
         image_bytes: bytes,
-        min_confidence: float = None
+        min_confidence: float = None,
+        as_blocks: bool = False
     ) -> List[str]:
         """
         Detect text from image using OCR with 4-direction rotation.
@@ -73,7 +74,7 @@ class VisionService:
         logger.info("Starting OCR with 4-direction rotation")
         
         tasks = [
-            self._rotate_and_detect(image_bytes, rotation, min_confidence)
+            self._rotate_and_detect(image_bytes, rotation, min_confidence, as_blocks)
             for rotation in [0, 90, 180, 270]
         ]
         
@@ -90,8 +91,11 @@ class VisionService:
         
         # Remove duplicates and clean
         unique_texts = list(set(all_texts))
-        cleaned_texts = [clean_detected_text(text) for text in unique_texts]
-        cleaned_texts = [text for text in cleaned_texts if text]  # Remove empty
+        if as_blocks:
+            cleaned_texts = [text for text in unique_texts if text.strip()]
+        else:
+            cleaned_texts = [clean_detected_text(text) for text in unique_texts]
+            cleaned_texts = [text for text in cleaned_texts if text]  # Remove empty
         
         logger.info(f"OCR complete: {len(cleaned_texts)} unique texts detected")
         return cleaned_texts
@@ -100,7 +104,8 @@ class VisionService:
         self,
         image_bytes: bytes,
         rotation: int,
-        min_confidence: float
+        min_confidence: float,
+        as_blocks: bool = False
     ) -> List[str]:
         """
         Rotate image and detect text.
@@ -146,13 +151,17 @@ class VisionService:
                 # Use full text from first annotation
                 full_text = response.text_annotations[0].description
                 
-                # Split by newlines to get individual text segments
-                # This captures book titles that span multiple lines
-                text_lines = [line.strip() for line in full_text.strip().split('\n')]
-                detected_texts = [line for line in text_lines if line]
+                if as_blocks:
+                    # Keep the text block intact to preserve multi-line book structures
+                    detected_texts = [full_text.strip()]
+                else:
+                    # Split by newlines to get individual text segments
+                    # This captures book titles that span multiple lines
+                    text_lines = [line.strip() for line in full_text.strip().split('\n')]
+                    detected_texts = [line for line in text_lines if line]
                 
                 logger.debug(
-                    f"Rotation {rotation}°: {len(detected_texts)} text lines detected"
+                    f"Rotation {rotation}°: {len(detected_texts)} text units detected"
                 )
             else:
                 logger.debug(f"Rotation {rotation}°: No text detected")
@@ -316,8 +325,8 @@ class VisionService:
         Returns:
             List of cleaned book information with confidence scores
         """
-        # Step 1: OCR ile text tespit et
-        raw_texts = await self.detect_text_from_image(image_bytes)
+        # Step 1: OCR ile text tespit et (bloklar halinde)
+        raw_texts = await self.detect_text_from_image(image_bytes, as_blocks=True)
         
         if not raw_texts:
             logger.warning("No text detected from image")
@@ -326,33 +335,37 @@ class VisionService:
         logger.info(f"Detected {len(raw_texts)} raw texts from OCR")
         
         # Step 2: OpenAI ile kitap isimlerini düzelt ve normalize et
-        prompt = f"""Aşağıdaki OCR sonuçları bir kitap rafından alınmış ama hatalar içeriyor.
-Her satırı analiz et ve GERÇEKTEN BİR KİTAP ADI veya YAZAR İSMİ olup olmadığını belirle.
+        prompt = f"""Aşağıdaki OCR sonuçları bir kitap rafından 4 farklı açıdan (0, 90, 180, 270 derece) alınmıştır.
+Aynı kitaplar farklı yönlerde tekrar edebilir veya tek bir kitap ismi birden fazla satıra bölünmüş olabilir (örn: 'The Modern\\nFundamentals of Golf').
+Tüm metni bütüncül olarak analiz et ve GERÇEKTEN BİR KİTAP ADI veya YAZAR İSMİ olanları benzersiz (tekrarsız) bir liste olarak çıkar.
+
+LÜTFEN 'genres' ALANINI AŞAĞIDAKİ GEÇERLİ İNGİLİZCE KATEGORİLERDEN BİR VEYA BİRKAÇI İLE DOLDUR (Türkçe KULLANMA):
+[Action, Adventure, Fiction, Non Fiction, Science Fiction, Fantasy, Crime, Mythology, Dystopia, Mystery, Thriller, Romance, Biography, History, Science, Self Help, Poetry, Children, Young Adult, Classics, Suspense]
 
 OCR Sonuçları:
-{chr(10).join(raw_texts[:50])}
+{chr(10).join(raw_texts)}
 
-Her tespit edilen kitap için şu formatta JSON döndür:
+Her tespit edilen benzersiz kitap için şu formatta JSON döndür:
 {{
   "title": "Kitap Adı",
   "author": "Yazar Adı (eğer tespit edildiyse)",
   "confidence": 0.9,
-  "genres": ["Tür1", "Tür2"],
+  "genres": ["Fantasy", "Classics"],
   "original_ocr": "orijinal OCR text"
 }}
 
 Önemli:
-- Kitap adı değilse (barkod, numara, anlamsız text), dahil etme
-- Türkçe karakterleri düzgün yaz (ş, ğ, ü, ö, ç, ı)
-- Confidence 0-1 arası olsun
-- Sadece JSON array döndür, başka açıklama yapma
+- Kitap adları iki satıra bölünmüşse onları akıllıca birleştir.
+- Aynı kitap OCR dizilerinde birkaç kez geçse bile JSON'da sadece BİR KERE yer almalı (en doğru yazılışı seç).
+- Kitap adı değilse (barkod, numara, yayınevi logosu vb.), dahil etme.
+- Sadece JSON array döndür, başka açıklama yapma.
 
 JSON array:"""
         
         try:
             response = await openai_service.generate_completion(
                 prompt=prompt,
-                max_tokens=2000,
+                max_tokens=4000,
                 temperature=0.3
             )
             
@@ -418,19 +431,19 @@ JSON array:"""
         logger.info(f"Matching {len(detected_books)} books to user profile")
         
         # Step 1: OpenAI ile kitapları kullanıcı profiline göre skorla
-        prompt = f"""Kullanıcı Okuma Profili:
-{json.dumps(user_profile, ensure_ascii=False, indent=2)}
+        prompt = f"""Kullanıcı Okuma Profili: {json.dumps(user_profile, ensure_ascii=False, indent=2)}
+Kitaplıktaki Kitaplar: {json.dumps(detected_books[:30], ensure_ascii=False, indent=2)}
 
-Kitaplıktaki Kitaplar:
-{json.dumps(detected_books[:30], ensure_ascii=False, indent=2)}
+Senden iki şey bekliyorum:
+1) Rafa bakarak raf sahibinin okuma analizi
+2) Eğer Kullanıcı Okuma Profilinde 'has_history': true ise, bu kitaplıktan kullanıcıya BAŞKA KİTAPLAR öner (match_score ve reason ile). Eğer 'has_history': false ise, YANİ kullanıcının profil geçmişi yoksa KESİNLİKLE hiçbir kitap önerme (recommendations listesi BOŞ OLSUN []). Geçmişi olmayan kullanıcıya kitaba göre öneri yapamayız.
 
-Bu kullanıcı için kitaplıktaki hangi kitapları önerirsin?
-Her kitap için 0-1 arası match_score ver ve neden önerdiğini açıkla.
-
-Ayrıca raf analizi yap:
+Raf analizi için şunları dikkate al:
 - Raftaki genel türler neler?
 - Raf sahibinin okuma tarzı nasıl?
-- Kullanıcı ile raf uyumluluğu ne kadar? (0-1)
+- Kullanıcı ile raf uyumluluğu ne kadar? (geçmiş yoksa 0.5 ver)
+ÖNEMLİ: 'dominant_genres' listesi, SADECE AŞAĞIDAKİ İNGİLİZCE LİSTEDEN SEÇİLEN türleri içermelidir:
+[Action, Adventure, Fiction, Non Fiction, Science Fiction, Fantasy, Crime, Mythology, Dystopia, Mystery, Thriller, Romance, Biography, History, Science, Self Help, Poetry, Children, Young Adult, Classics, Suspense]
 
 JSON formatında döndür:
 {{
@@ -443,14 +456,14 @@ JSON formatında döndür:
     }}
   ],
   "shelf_analysis": {{
-    "dominant_genres": ["Tür1", "Tür2"],
+    "dominant_genres": ["Fantasy", "Classics"],
     "reading_style": "Raf sahibinin okuma tarzı açıklaması",
-    "user_compatibility": 0.75
+    "user_compatibility": 0.5
   }}
 }}
 
-Sadece match_score > 0.6 olanları dahil et ve score'a göre sıralı döndür.
-Sadece JSON döndür:"""
+Tekrar Ediyorum: Profil 'has_history': false ise "recommendations": [] olmalı.
+Sadece match_score > 0.6 olanları dahil et ve score'a göre sıralı döndür. Sadece JSON döndür:"""
         
         try:
             response = await openai_service.generate_completion(

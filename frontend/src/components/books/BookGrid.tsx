@@ -12,6 +12,7 @@ interface Book {
     author: string;
     price: number;
     rating?: number; // Optional as API might not return it yet
+    reviews_count?: number;
     cover_url?: string;
 }
 
@@ -156,13 +157,13 @@ export default function BookGrid({ books: initialBooks, isLoading, genre }: Book
             >
                 {displayedBooks.map((book) => (
                     <div key={book.id} className="h-full">
-                        {/* Reuse BookCard */}
                         <BookCard
                             id={book.id}
                             title={book.title}
                             author={book.author}
                             price={Number(book.price)}
-                            rating={book.rating || 4.5} // Default rating if missing
+                            rating={book.rating}
+                            reviews_count={book.reviews_count}
                             imageSrc={book.cover_url || "/book-placeholder.jpg"}
                         // variant={viewMode} // If BookCard supports variant
                         />

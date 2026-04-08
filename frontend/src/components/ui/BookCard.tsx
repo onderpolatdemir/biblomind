@@ -14,14 +14,15 @@ interface BookCardProps {
     title: string;
     author: string;
     price: number;
-    rating: number;
+    rating?: number;
+    reviews_count?: number;
     imageSrc: string;
     variant?: "grid" | "list";
     onToggle?: () => void;
 }
 
 // ... inside component ...
-export default function BookCard({ id, title, author, price, rating, imageSrc, variant = "grid", onToggle }: BookCardProps) {
+export default function BookCard({ id, title, author, price, rating, reviews_count, imageSrc, variant = "grid", onToggle }: BookCardProps) {
     const { addToCart } = useCart();
     const { user } = useAuth();
     const { isFavorite, toggleFavorite } = useFavorites(); // Use new hook
@@ -84,7 +85,9 @@ export default function BookCard({ id, title, author, price, rating, imageSrc, v
 
                             <div className="flex items-center gap-2 mb-4">
                                 <span className="text-yellow-400 text-sm">★</span>
-                                <span className="text-sm font-medium text-text">{rating}</span>
+                                <span className="text-sm font-medium text-text">
+                                    {rating ? Number(rating).toFixed(1) : "-"} {reviews_count !== undefined ? `(${reviews_count}review)` : "(0review)"}
+                                </span>
                                 <span className="text-gray-300">|</span>
                                 <span className="text-xs text-gray-400">In Stock</span>
                             </div>
@@ -146,11 +149,13 @@ export default function BookCard({ id, title, author, price, rating, imageSrc, v
                     <h3 className="text-lg font-bold text-text line-clamp-2 leading-tight mb-1 font-heading h-[3.00rem] group-hover:text-primary transition-colors">{title}</h3>
                     <p className="text-sm text-gray-500 mb-2 line-clamp-1" title={author}>By: {author}</p>
 
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-1 mb-2">
                         <span className="text-yellow-400 text-sm">★</span>
-                        <span className="text-sm font-medium text-text">{rating}</span>
-                        <span className="text-gray-300">|</span>
-                        <span className="text-lg font-bold text-accent">${price}</span>
+                        <span className="text-sm font-medium text-text">
+                            {rating ? Number(rating).toFixed(1) : "-"} {reviews_count !== undefined ? `(${reviews_count}review)` : "(0review)"}
+                        </span>
+                        <span className="text-gray-300 ml-1">|</span>
+                        <span className="text-lg font-bold text-accent ml-1">${price}</span>
                     </div>
                 </div>
 

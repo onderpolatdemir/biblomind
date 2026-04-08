@@ -7,7 +7,8 @@ import Header from "@/components/layout/Header";
 import BookCard from "@/components/ui/BookCard";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { CATEGORIES } from "@/lib/constants";
+import { CATEGORIES } from "@/lib/constants"; // Shared constants
+import LoadingGame from "@/components/ui/LoadingGame";
 import { Camera, Sparkles, BookOpen, CheckCircle, XCircle } from "lucide-react";
 
 type Book = {
@@ -16,6 +17,9 @@ type Book = {
     author: string;
     price: number;
     cover_url: string;
+    rating?: number;
+    reviews_count?: number;
+    // Add other fields as needed
 };
 
 type ShelfRecommendation = {
@@ -32,6 +36,7 @@ type ShelfRecommendation = {
 };
 
 type ShelfResult = {
+    analysis_id?: string;
     detected_books: string[];
     recommendations: ShelfRecommendation[];
     shelf_compatibility_score?: number;
@@ -61,6 +66,9 @@ export default function HomePage() {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [uploadStatus, setUploadStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+    const [books, setBooks] = useState<Book[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
     const [shelfResult, setShelfResult] = useState<ShelfResult | null>(null);
     const [recommendedBooks, setRecommendedBooks] = useState<Book[]>([]);
@@ -97,29 +105,40 @@ export default function HomePage() {
 
         const imageUrl = URL.createObjectURL(file);
         setSelectedImage(imageUrl);
+        setUploadStatus("loading");
+        setUploadStage("uploading");
         setShelfResult(null);
 
+        // Real API Call to Vision Model
         try {
-            setUploadStage("uploading");
             await new Promise((r) => setTimeout(r, 600));
-
             setUploadStage("detecting");
+
             const formData = new FormData();
             formData.append("file", file);
 
             const response = await api.post("/vision/match-shelf", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+                timeout: 60000, // Important: Allow long timeout since vision analysis takes 10+ seconds
             });
 
             setUploadStage("recommending");
             await new Promise((r) => setTimeout(r, 500));
 
-            setShelfResult(response.data);
+            setUploadStatus("success");
             setUploadStage("done");
-        } catch (err: any) {
-            console.error("Vision API error:", err);
+            setShelfResult(response.data);
+
+        } catch (error: any) {
+            console.error("Failed to analyze bookshelf:", error);
+            setUploadStatus("error");
             setUploadStage("error");
+            alert(error.response?.data?.detail || "Failed to analyze your bookshelf. Please try again.");
+
         }
+
     };
 
     const handleSeeAll = () => {
@@ -128,127 +147,150 @@ export default function HomePage() {
         }
     };
 
+    const triggerFileUpload = () => {
+        if (fileInputRef.current) fileInputRef.current.click();
+    };
+
     const resetUpload = () => {
         setSelectedImage(null);
+        setUploadStatus("idle");
         setUploadStage("idle");
         setShelfResult(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
-
     return (
         <div className="min-h-screen bg-background flex flex-col font-body">
             <Header />
 
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-12">
 
-                {/* Hero / Upload Container */}
+                {/* Hero / Upload Container / Game Container */}
                 <motion.section
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-                    className="relative bg-secondary/30 rounded-[3rem] p-8 md:p-16 mb-16 overflow-hidden"
+                    transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+                    className="relative bg-secondary/30 rounded-[3rem] p-8 md:p-16 mb-24 overflow-hidden min-h-[500px] flex items-center justify-center"
                 >
-                    <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
+                    <AnimatePresence mode="wait">
+                        {uploadStatus === "loading" ? (
+                            <motion.div
+                                key="game"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="w-full h-full relative z-20"
+                            >
+                                <LoadingGame />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="hero"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="flex flex-col md:flex-row items-center gap-12 relative z-10 w-full"
+                            >
+                                {/* Left Content */}
+                                <div className="flex-1 text-center md:text-left">
+                                    <h1 className="text-4xl md:text-6xl font-heading font-bold text-text mb-6 leading-tight">
+                                        Let's see if we know <br /> you well enough?
+                                    </h1>
+                                    <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-xl leading-relaxed">
+                                        Confused about what to read? Upload a photo of your bookshelf and let AI find your perfect next book.
+                                    </p>
 
-                        {/* Left Content */}
-                        <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-4xl md:text-6xl font-heading font-bold text-text mb-6 leading-tight">
-                                Let's see if we know <br /> you well enough?
-                            </h1>
-                            <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-xl leading-relaxed">
-                                Confused about what to read? Upload a photo of your bookshelf and let AI find your perfect next book.
-                            </p>
+                                    <div className="flex flex-col md:flex-row items-center gap-6">
+                                        <button
+                                            onClick={triggerFileUpload}
+                                            disabled={uploadStage !== "idle" && uploadStage !== "error" && uploadStage !== "done"}
+                                            className="group relative flex items-center gap-3 bg-text text-white px-8 py-4 rounded-full font-bold hover:bg-accent transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none z-20"
+                                        >
+                                            <Camera size={22} />
+                                            <span>{uploadStatus === "success" ? "Redirecting..." : "Upload a Bookshelf"}</span>
+                                        </button>
 
-                            <div className="flex flex-col md:flex-row items-center gap-6">
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={uploadStage !== "idle" && uploadStage !== "error" && uploadStage !== "done"}
-                                    className="group relative flex items-center gap-3 bg-text text-white px-8 py-4 rounded-full font-bold hover:bg-accent transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
-                                >
-                                    <Camera size={22} />
-                                    <span>Upload a Bookshelf</span>
-                                </button>
+                                        <input
+                                            type="file"
+                                            accept=".png,.jpg,.jpeg,.webp"
+                                            hidden
+                                            ref={fileInputRef}
+                                            onChange={handleFileSelect}
+                                        />
 
-                                <input
-                                    type="file"
-                                    accept=".png,.jpg,.jpeg,.webp"
-                                    hidden
-                                    ref={fileInputRef}
-                                    onChange={handleFileSelect}
-                                />
-
-                                {selectedImage && uploadStage === "done" && (
-                                    <button
-                                        onClick={resetUpload}
-                                        className="text-sm text-gray-500 hover:text-accent underline transition-colors"
-                                    >
-                                        Try another photo
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Progress Bar */}
-                            <AnimatePresence>
-                                {uploadStage !== "idle" && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 8 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0 }}
-                                        className="mt-6 max-w-md"
-                                    >
-                                        {uploadStage === "error" ? (
-                                            <div className="flex items-center gap-2 text-red-600 font-medium">
-                                                <XCircle size={18} />
-                                                <span>{STAGE_LABELS.error}</span>
-                                            </div>
-                                        ) : uploadStage === "done" ? (
-                                            <div className="flex items-center gap-2 text-green-700 font-medium">
-                                                <CheckCircle size={18} />
-                                                <span>{STAGE_LABELS.done}</span>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <p className="text-sm text-gray-600 mb-2 font-medium">{STAGE_LABELS[uploadStage]}</p>
-                                                <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                                    <motion.div
-                                                        className="h-full bg-accent rounded-full"
-                                                        initial={{ width: "0%" }}
-                                                        animate={{ width: `${STAGE_PROGRESS[uploadStage]}%` }}
-                                                        transition={{ duration: 0.6, ease: "easeOut" }}
-                                                    />
-                                                </div>
-                                            </>
+                                        {selectedImage && uploadStage === "done" && (
+                                            <button
+                                                onClick={resetUpload}
+                                                className="text-sm text-gray-500 hover:text-accent underline transition-colors"
+                                            >
+                                                Try another photo
+                                            </button>
                                         )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
+                                    </div>
 
-                        {/* Right Visual */}
-                        <div className="flex-1 w-full flex justify-center md:justify-end gap-4 relative h-80 md:h-96 items-end">
-                            {selectedImage ? (
-                                <motion.div
-                                    initial={{ scale: 0.9, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    className="relative w-64 h-80 rounded-3xl overflow-hidden shadow-2xl border-4 border-white"
-                                >
-                                    <Image src={selectedImage} alt="Your shelf" fill className="object-cover" />
-                                </motion.div>
-                            ) : (
-                                <>
-                                    <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8">
-                                        <Image src="/lotr.png" alt="Book 1" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
-                                    </div>
-                                    <div className="relative w-40 h-72 md:w-48 md:h-96 bg-white rounded-t-full shadow-2xl overflow-hidden z-10 -ml-8 border-4 border-secondary">
-                                        <Image src="/nutuk.png" alt="Book 2" fill className="object-cover hover:scale-105 transition-transform duration-500" />
-                                    </div>
-                                    <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8 -ml-8">
-                                        <Image src="/hp.png" alt="Book 3" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
+                                    {/* Progress Bar */}
+                                    <AnimatePresence>
+                                        {uploadStage !== "idle" && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0 }}
+                                                className="mt-6 max-w-md"
+                                            >
+                                                {uploadStage === "error" ? (
+                                                    <div className="flex items-center gap-2 text-red-600 font-medium">
+                                                        <XCircle size={18} />
+                                                        <span>{STAGE_LABELS.error}</span>
+                                                    </div>
+                                                ) : uploadStage === "done" ? (
+                                                    <div className="flex items-center gap-2 text-green-700 font-medium">
+                                                        <CheckCircle size={18} />
+                                                        <span>{STAGE_LABELS.done}</span>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-sm text-gray-600 mb-2 font-medium">{STAGE_LABELS[uploadStage]}</p>
+                                                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                                                            <motion.div
+                                                                className="h-full bg-accent rounded-full"
+                                                                initial={{ width: "0%" }}
+                                                                animate={{ width: `${STAGE_PROGRESS[uploadStage]}%` }}
+                                                                transition={{ duration: 0.6, ease: "easeOut" }}
+                                                            />
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+
+                                {/* Right Visual */}
+                                <div className="flex-1 w-full flex justify-center md:justify-end gap-4 relative h-80 md:h-96 items-end">
+                                    {selectedImage ? (
+                                        <motion.div
+                                            initial={{ scale: 0.9, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            className="relative w-64 h-80 rounded-3xl overflow-hidden shadow-2xl border-4 border-white"
+                                        >
+                                            <Image src={selectedImage} alt="Your shelf" fill className="object-cover" />
+                                        </motion.div>
+                                    ) : (
+                                        <>
+                                            <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8">
+                                                <Image src="/lotr.png" alt="Book 1" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
+                                            </div>
+                                            <div className="relative w-40 h-72 md:w-48 md:h-96 bg-white rounded-t-full shadow-2xl overflow-hidden z-10 -ml-8 border-4 border-secondary">
+                                                <Image src="/nutuk.png" alt="Book 2" fill className="object-cover hover:scale-105 transition-transform duration-500" />
+                                            </div>
+                                            <div className="relative w-32 h-64 md:w-40 md:h-80 bg-white rounded-t-full shadow-lg overflow-hidden transform translate-y-8 -ml-8">
+                                                <Image src="/hp.png" alt="Book 3" fill className="object-cover opacity-90 hover:scale-105 transition-transform duration-500" />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </motion.section>
 
                 {/* Shelf Analysis Results */}
@@ -316,6 +358,16 @@ export default function HomePage() {
                                             </div>
                                         ))}
                                     </div>
+                                    {shelfResult.analysis_id && (
+                                        <div className="mt-8 text-center">
+                                            <button
+                                                onClick={() => router.push(`/shelf-recommendations/${shelfResult.analysis_id}`)}
+                                                className="inline-flex items-center gap-2 bg-text text-white font-bold px-8 py-4 rounded-xl hover:bg-opacity-90 transition-all shadow-md mx-auto"
+                                            >
+                                                View Detailed Analysis
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </motion.section>
@@ -373,7 +425,8 @@ export default function HomePage() {
                                     id={book.id}
                                     title={book.title}
                                     author={book.author || "Unknown Author"}
-                                    rating={4.5}
+                                    rating={book.rating || 4.5}
+                                    reviews_count={book.reviews_count}
                                     price={Number(book.price)}
                                     imageSrc={book.cover_url || "/hp.png"}
                                 />

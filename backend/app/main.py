@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -13,6 +15,9 @@ from app.core.middleware import logging_middleware, global_exception_handler
 from app.core.rate_limit import init_rate_limiting
 from app.core.monitoring import init_sentry
 from app.api import api_router
+
+# Ensure static uploads directory exists
+os.makedirs("static/uploads/shelves", exist_ok=True)
 
 
 @asynccontextmanager
@@ -95,6 +100,9 @@ init_rate_limiting(app)
 
 # Exception Handlers
 app.add_exception_handler(Exception, global_exception_handler)
+
+# Mount Static Files (for uploaded bookshelf photos)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Mount API Router
 app.include_router(api_router, prefix="/api")

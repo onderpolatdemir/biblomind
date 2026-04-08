@@ -11,7 +11,7 @@ import ExpandableSearchBar from "@/components/expandable-search-bar";
 import {
     Book, Brain, Rocket, Sparkles, Search, ShoppingCart,
     Ghost, Heart, PenTool, Landmark, FlaskConical, House, LayoutGrid, Info,
-    Leaf, Feather, Baby, User, Scroll, Users, ShoppingBag, LayoutDashboard
+    Leaf, Feather, Baby, User, Scroll, Camera, Users, ShoppingBag, LayoutDashboard
 } from "lucide-react";
 import { CATEGORIES } from "@/lib/constants"; // Shared constants
 
@@ -181,10 +181,16 @@ export default function Header() {
                         Book Buddies
                     </div>
                 </Link>
-                <Link href="/about" className="hover:text-primary transition-colors py-4">
+                <Link href="/recommendations" className="hover:text-primary transition-colors py-4">
                     <div className="flex items-center gap-1">
-                        <Info />
-                        About
+                        <Sparkles />
+                        Recommendations
+                    </div>
+                </Link>
+                <Link href="/shelf-recommendations" className="hover:text-primary transition-colors py-4">
+                    <div className="flex items-center gap-1">
+                        <Camera />
+                        Shelf Match
                     </div>
                 </Link>
             </div>
@@ -304,8 +310,8 @@ export default function Header() {
                                 <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>🛍️</span> Shop
                                 </Link>
-                                <Link href="/about" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
-                                    <span>ℹ️</span> About
+                                <Link href="/shelf-recommendations" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
+                                    <span>📸</span> Shelf Match
                                 </Link>
                                 <Link href="/book-buddies" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>👥</span> Book Buddies
@@ -315,6 +321,9 @@ export default function Header() {
                                 </Link>
                                 <Link href="/cart" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>🛒</span> My Cart
+                                </Link>
+                                <Link href="/recommendations" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
+                                    <span>✨</span> Recommendations
                                 </Link>
                                 <Link href="/checkout" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center gap-3">
                                     <span>💳</span> Checkout

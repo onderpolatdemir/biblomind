@@ -9,6 +9,7 @@ import Header from "@/components/layout/Header";
 import ProfileInfo from "@/components/profile/ProfileInfo";
 import AddressManager from "@/components/profile/AddressManager";
 import OrderHistory from "@/components/profile/OrderHistory";
+import ReviewHistory from "@/components/profile/ReviewHistory";
 import {
     User as UserIcon,
     MapPin,
@@ -216,7 +217,7 @@ function MyReviewsTab() {
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="flex gap-0.5">
-                                {[1,2,3,4,5].map(s => (
+                                {[1, 2, 3, 4, 5].map(s => (
                                     <Star key={s} className={`w-4 h-4 ${s <= review.rating ? "fill-orange-400 text-orange-400" : "text-gray-200"}`} />
                                 ))}
                             </div>
@@ -383,6 +384,7 @@ export default function ProfilePage() {
         }
     };
 
+
     if (!user) {
         return (
             <div className="min-h-screen bg-gray-50 font-body">
@@ -395,13 +397,13 @@ export default function ProfilePage() {
     }
 
     const menuItems = [
-        { id: "info",        label: "Personal Information", icon: UserIcon },
-        { id: "address",     label: "My Addresses",         icon: MapPin },
-        { id: "orders",      label: "My Orders",            icon: ShoppingBag },
-        { id: "connections", label: "My Connections",       icon: Users },
-        { id: "potential",   label: "Potential Buddies",    icon: UserSearch },
-        { id: "scans",       label: "My Scans",             icon: Camera },
-        { id: "reviews",     label: "My Reviews",           icon: Star },
+        { id: "info", label: "Personal Information", icon: UserIcon },
+        { id: "address", label: "My Addresses", icon: MapPin },
+        { id: "orders", label: "My Orders", icon: ShoppingBag },
+        { id: "connections", label: "My Connections", icon: Users },
+        { id: "potential", label: "Potential Buddies", icon: UserSearch },
+        { id: "scans", label: "My Scans", icon: Camera },
+        { id: "reviews", label: "My Reviews", icon: Star },
     ];
 
     return (
@@ -431,8 +433,8 @@ export default function ProfilePage() {
                                         key={item.id}
                                         onClick={() => setActiveTab(item.id as any)}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-                                                ? "bg-primary text-white font-bold shadow-md"
-                                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                            ? "bg-primary text-white font-bold shadow-md"
+                                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                                             }`}
                                     >
                                         <item.icon size={18} />
@@ -476,14 +478,14 @@ export default function ProfilePage() {
                             transition={{ duration: 0.3 }}
                         >
                             {activeTab === "info" && (
-                                <ProfileInfo user={user} onUpdate={() => {}} />
+                                <ProfileInfo user={user} onUpdate={() => { }} />
                             )}
                             {activeTab === "address" && <AddressManager />}
                             {activeTab === "orders" && <OrderHistory />}
                             {activeTab === "connections" && <MyConnectionsTab />}
                             {activeTab === "potential" && <PotentialBuddiesTab />}
                             {activeTab === "scans" && <MyScansTab />}
-                            {activeTab === "reviews" && <MyReviewsTab />}
+                            {activeTab === "reviews" && <ReviewHistory />}
                         </motion.div>
                     </div>
                 </div>
