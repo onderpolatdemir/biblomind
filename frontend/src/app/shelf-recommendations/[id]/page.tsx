@@ -44,7 +44,7 @@ export default function ShelfAnalysisDetail() {
 
             try {
                 // Fetch the saved JSON for this exact analysis
-                const res = await api.get(`/vision/vision/shelf-analyses/${id}`);
+                const res = await api.get(`/vision/shelf-analyses/${id}`);
                 const parsed = res.data;
                 setOriginalResponse(parsed);
 

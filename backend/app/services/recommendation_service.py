@@ -112,7 +112,7 @@ class RecommendationService:
                     "total": len(recommendations),
                     "strategy": "popular_fallback",
                     "user_has_history": interaction_count > 0,
-                    "message": "Henüz yeterli veriye sahip değiliz, size popüler kitapları öneriyoruz!"
+                    "message": "We don't have enough data yet, so we're recommending popular books!"
                 }
             
             # Generate recommendations based on strategy
@@ -665,63 +665,63 @@ class RecommendationService:
             # 1. Author Match (Strongest explicit match)
             if book.author and book.author in fav_authors:
                 templates = [
-                    f"Daha önce etkileşime girdiğiniz yazar '{book.author}' kaleminden çıktığı için öneriliyor.",
-                    f"Kitaplığınızda '{book.author}' eserleri bulunduğu için bu kitabı da çok sevebilirsiniz.",
-                    f"Favori yazarlarınızdan biri olan '{book.author}' imzalı bu eser tam size göre."
+                    f"Recommended because it's from '{book.author}', an author you've previously engaged with.",
+                    f"Since you already have works by '{book.author}' in your library, you'll likely love this one too.",
+                    f"This book is signed by '{book.author}', one of your favorite authors — a perfect fit for you."
                 ]
                 return random.choice(templates)
-            
+
             # 2. Genre Match
             if book.genres:
                 matching_genres = [g for g in book.genres if g in fav_genres]
                 if matching_genres:
                     genre_str = matching_genres[0]
                     templates = [
-                        f"İlginizi çeken '{genre_str}' türünde popüler bir eser olduğu için sizin için seçtik.",
-                        f"Kütüphanenizdeki diğer '{genre_str}' kitaplarına harika bir alternatif.",
-                        f"Favorileriniz arasında '{genre_str}' türü öne çıkıyor, bu kitap beklentinizi karşılayabilir.",
-                        f"Geçmiş siparişlerinize dayanarak '{genre_str}' kategorisinden bir solukta okuyacağınız bir öneri."
+                        f"We picked this for you because it's a popular title in '{genre_str}', a genre you enjoy.",
+                        f"A great alternative to the other '{genre_str}' books in your library.",
+                        f"'{genre_str}' stands out among your favorites — this book should meet your expectations.",
+                        f"Based on your past orders, here's a '{genre_str}' pick you'll breeze through."
                     ]
                     return random.choice(templates)
 
         # 3. High Content Similarity fallback
         if content_score > 0.85:
             templates = [
-                "Okuma geçmişiniz ve favori kitaplarınızın tarzıyla %90'ın üzerinde yüksek bir uyum yakaladık!",
-                "Kitap zevkinizle neredeyse birebir örtüşen, kesinlikle şans vermeniz gereken bir kitap.",
-                "Algoritmamız bu kitabın okuma profilinizle mükemmel bir eşleşme sağladığını söylüyor."
+                "We found over 90% alignment with your reading history and favorite books!",
+                "This book matches your taste almost perfectly — you should definitely give it a try.",
+                "Our algorithm says this book is a perfect match for your reading profile."
             ]
             return random.choice(templates)
-            
+
         elif content_score > 0.65:
             templates = [
-                "Geçmişte incelediğiniz kitaplarla benzer temalar içerdiği için beğeneceğinizi düşünüyoruz.",
-                "Son zamanlarda ilgi gösterdiğiniz kitapların kurgusuyla paralellik gösteriyor.",
-                "Profilinize göre bu kitap tarzınıza oldukça yakın görünüyor."
+                "We think you'll like this because it shares similar themes with books you've explored.",
+                "It aligns closely with the style of books you've been interested in recently.",
+                "Based on your profile, this book looks very close to your taste."
             ]
             return random.choice(templates)
-            
+
         # 4. Pure Popularity fallback
         if is_popular:
             if interaction_count > 5:
                 templates = [
-                    f"Platformdaki favori kitaplardan biri. {interaction_count} okurumuz tarafından tercih edildi!",
-                    f"Şu sıralar çok popüler! Okurlarımız bu kitaba yoğun ilgi gösteriyor.",
-                    f"Kapsamlı okur kitlemiz tarafından onaylanmış, çok satanlar listesinde bir eser."
+                    f"One of the favorite books on the platform — chosen by {interaction_count} of our readers!",
+                    f"Very popular right now! Our readers are showing great interest in this book.",
+                    f"Approved by our wide reader base — a bestseller on our lists."
                 ]
                 return random.choice(templates)
             else:
                 templates = [
-                    "Platformumuzdaki dikkat çeken, yeni parlayan eserlerden biri.",
-                    "Okurlarımızın kitaplıklarına eklemeye başladığı popüler bir kitap.",
-                    "Genel okuyucu kitlesinin ilgisini çeken başarılı bir yapıt."
+                    "One of the standout new titles shining on our platform.",
+                    "A popular book our readers have been adding to their libraries.",
+                    "A successful work drawing attention from our general readership."
                 ]
                 return random.choice(templates)
-            
+
         templates = [
-            "Okuma tarzınıza uygun olabileceğini düşündüğümüz için önerdik.",
-            "Geniş algoritmamız sizin için bu kitabı seçti, bir göz Atmada fayda var!",
-            "Koleksiyonunuza renk katacağını düşündüğümüz özel bir seçim."
+            "We recommended this because we thought it might match your reading style.",
+            "Our broad algorithm picked this book for you — worth taking a look!",
+            "A special selection we believe will add color to your collection."
         ]
         return random.choice(templates)
     
@@ -786,7 +786,7 @@ class RecommendationService:
             
         except Exception as e:
             logger.error(f"Error generating explanation: {e}")
-            return "Bu kitap ilgi alanlarınıza uygun!"
+            return "This book matches your interests!"
     
     async def close(self):
         """Close service connections."""

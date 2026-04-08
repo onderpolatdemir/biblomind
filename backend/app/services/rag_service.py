@@ -218,37 +218,37 @@ class RAGService:
             Formatted context string
         """
         if not books:
-            return "Context: Veritabanında alakalı kitap bulunamadı."
-        
+            return "Context: No relevant books were found in the database."
+
         # Limit books
         books = books[:max_books]
-        
-        context_lines = ["İLGİLİ KİTAPLAR:"]
-        
+
+        context_lines = ["RELEVANT BOOKS:"]
+
         for i, book in enumerate(books, 1):
             # Format: Number. Title - Author (Genre)
             book_line = f"{i}. {book['title']} - {book['author']}"
-            
+
             if book.get('genre'):
                 book_line += f" ({book['genre']})"
-            
+
             # Add similarity score if available
             if 'similarity_score' in book:
                 score_percent = int(book['similarity_score'] * 100)
-                book_line += f" [Eşleşme: %{score_percent}]"
-            
+                book_line += f" [Match: {score_percent}%]"
+
             context_lines.append(book_line)
-            
+
             # Add description (truncated)
             if book.get('description'):
                 desc = book['description'][:150]
                 if len(book['description']) > 150:
                     desc += "..."
-                context_lines.append(f"   Açıklama: {desc}")
-            
+                context_lines.append(f"   Description: {desc}")
+
             # Add price if available
             if book.get('price'):
-                context_lines.append(f"   Fiyat: {book['price']} TL")
+                context_lines.append(f"   Price: ${book['price']}")
         
         context = "\n".join(context_lines)
         

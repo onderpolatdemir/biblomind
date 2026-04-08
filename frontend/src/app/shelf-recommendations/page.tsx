@@ -24,7 +24,7 @@ export default function ShelfRecommendationsGallery() {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const response = await api.get("/vision/vision/shelf-analyses");
+                const response = await api.get("/vision/shelf-analyses");
                 setHistory(response.data);
             } catch (error) {
                 console.error("Failed to fetch shelf analysis history:", error);

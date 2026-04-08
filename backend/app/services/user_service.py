@@ -375,20 +375,21 @@ class UserService:
         
         logger.info(f"Found {len(books)} books for user profile analysis")
         
-        # OpenAI ile profil oluştur
-        prompt = f"""Kullanıcının beğendiği/satın aldığı kitaplar:
+        # Build user profile with OpenAI
+        prompt = f"""Books the user liked / purchased:
 {json.dumps(books[:20], ensure_ascii=False, indent=2)}
 
-Bu kullanıcının okuma profilini çıkar ve JSON formatında döndür:
+Extract this user's reading profile and return it as JSON:
 {{
-  "favorite_genres": ["Tür1", "Tür2", "Tür3"],
-  "favorite_authors": ["Yazar1", "Yazar2"],
-  "themes": ["tema1", "tema2", "tema3"],
-  "style_preferences": ["karanlık", "düşündürücü", "aksiyon dolu"],
+  "favorite_genres": ["Genre1", "Genre2", "Genre3"],
+  "favorite_authors": ["Author1", "Author2"],
+  "themes": ["theme1", "theme2", "theme3"],
+  "style_preferences": ["dark", "thought-provoking", "action-packed"],
   "reading_level": "beginner|intermediate|advanced"
 }}
 
-Sadece JSON döndür, başka açıklama yapma:"""
+All textual values must be in English.
+Return only the JSON — no other explanation:"""
         
         try:
             response = await openai_service.generate_completion(

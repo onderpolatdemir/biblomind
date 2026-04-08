@@ -23,21 +23,27 @@ type Book = {
 };
 
 type ShelfRecommendation = {
-    book: {
-        id: string;
-        title: string;
-        author: string;
-        price: number;
-        cover_url: string;
-    };
+    title: string;
+    author: string;
     match_score: number;
-    explanation: string;
+    reason: string;
     in_our_store: boolean;
+    book_id: string | null;
+    price: number | null;
+    cover_url: string | null;
+};
+
+type DetectedBook = {
+    title: string;
+    author: string;
+    confidence: number;
+    genres: string[];
+    original_ocr: string;
 };
 
 type ShelfResult = {
     analysis_id?: string;
-    detected_books: string[];
+    detected_books: DetectedBook[];
     recommendations: ShelfRecommendation[];
     shelf_compatibility_score?: number;
 };
@@ -310,12 +316,12 @@ export default function HomePage() {
                                         Books Detected on Your Shelf
                                     </h2>
                                     <div className="flex flex-wrap gap-2">
-                                        {shelfResult.detected_books.map((title, i) => (
+                                        {shelfResult.detected_books.map((book, i) => (
                                             <span
                                                 key={i}
                                                 className="px-3 py-1.5 bg-secondary text-text text-sm font-medium rounded-full border border-gray-200"
                                             >
-                                                {title}
+                                                {book.title}{book.author ? ` — ${book.author}` : ""}
                                             </span>
                                         ))}
                                     </div>
@@ -330,20 +336,20 @@ export default function HomePage() {
                                         Books We Think You'll Love
                                     </h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {shelfResult.recommendations.map((rec) => (
-                                            <div key={rec.book.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                                        {shelfResult.recommendations.map((rec, i) => (
+                                            <div key={rec.book_id ?? i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                                                 <BookCard
-                                                    id={rec.book.id}
-                                                    title={rec.book.title}
-                                                    author={rec.book.author}
-                                                    price={Number(rec.book.price)}
+                                                    id={rec.book_id ?? ""}
+                                                    title={rec.title}
+                                                    author={rec.author}
+                                                    price={Number(rec.price ?? 0)}
                                                     rating={Math.round(rec.match_score * 5 * 10) / 10}
-                                                    imageSrc={rec.book.cover_url || "/hp.png"}
+                                                    imageSrc={rec.cover_url || "/hp.png"}
                                                 />
-                                                {rec.explanation && (
+                                                {rec.reason && (
                                                     <div className="px-4 pb-4">
                                                         <p className="text-xs text-gray-500 leading-relaxed border-t border-gray-100 pt-3">
-                                                            {rec.explanation}
+                                                            {rec.reason}
                                                         </p>
                                                     </div>
                                                 )}

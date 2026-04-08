@@ -19,7 +19,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/vision", tags=["vision"])
+router = APIRouter(tags=["vision"])
 
 
 @router.post("/match-shelf", response_model=Dict[str, Any])
@@ -128,7 +128,7 @@ async def match_bookshelf_to_user(
                 "detected_books": [],
                 "recommendations": [],
                 "shelf_analysis": {},
-                "message": "Kitaplıkta kitap tespit edilemedi. Daha net bir fotoğraf yükleyin.",
+                "message": "No books were detected in the shelf. Please upload a clearer photo.",
                 "processing_time_ms": int((time.time() - start_time) * 1000)
             }
         
@@ -184,7 +184,7 @@ async def match_bookshelf_to_user(
             "detected_books": detected_books,
             "recommendations": matching_result['recommendations'],
             "shelf_analysis": matching_result['shelf_analysis'],
-            "message": f"Bu kitaplıktan size {len(matching_result['recommendations'])} kitap öneriyoruz!",
+            "message": f"We recommend {len(matching_result['recommendations'])} books from this shelf!",
             "processing_time_ms": processing_time_ms
         }
 

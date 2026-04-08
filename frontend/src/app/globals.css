@@ -102,3 +102,33 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Vivid hover colors for primary/accent action buttons.
+     Applies only to <button>/<a> elements with an exact .bg-primary or .bg-accent class,
+     so translucent variants (bg-primary/10) and non-interactive elements are unaffected.
+     The :not() guards prevent override when a button is in a success/disabled state. */
+  button[class~="bg-primary"]:not([class*="bg-green"]):not(:disabled):hover,
+  a[class~="bg-primary"]:not([class*="bg-green"]):hover {
+    background-color: #7cbd86;
+    /* vivid green — ~15% darker/saturated than #b4d2b8 */
+    box-shadow: 0 10px 25px -8px rgba(124, 189, 134, 0.55);
+  }
+
+  button[class~="bg-accent"]:not(:disabled):hover,
+  a[class~="bg-accent"]:hover {
+    background-color: #d9833f;
+    /* vivid warm copper — brighter than #b87241 */
+    box-shadow: 0 10px 25px -8px rgba(217, 131, 63, 0.5);
+  }
+
+  /* Smooth the color transition even if the element didn't declare one */
+  button[class~="bg-primary"],
+  a[class~="bg-primary"],
+  button[class~="bg-accent"],
+  a[class~="bg-accent"] {
+    transition-property: background-color, box-shadow, transform, border-color, color;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}

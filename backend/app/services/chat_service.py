@@ -10,6 +10,7 @@ from sqlalchemy import func, desc
 from app.models.conversation import Conversation, ConversationMessage
 from app.models.user import User
 from app.models.book import Book
+from app.models.user_interaction import UserInteraction
 from app.services.rag_service import RAGService
 from app.services.langchain_helper import LangChainHelper
 from app.services.recommendation_service import RecommendationService
@@ -112,12 +113,16 @@ class ChatService:
                 conversation_id=conversation.id,
                 limit=MAX_HISTORY_MESSAGES
             )
-            
+
+            # Build user profile context
+            user_context = self._build_user_context(user)
+
             # Generate AI response with RAG context
             ai_response = await self.langchain_helper.generate_rag_response(
                 user_message=message,
                 context=context,
-                conversation_history=history
+                conversation_history=history,
+                user_context=user_context
             )
             
             # Save user message
@@ -174,6 +179,41 @@ class ChatService:
             logger.error(f"Error in send_message: {e}", exc_info=True)
             raise
     
+    def _build_user_context(self, user: User) -> str:
+        """Build a short user profile string to inject into the LLM system prompt."""
+        lines = []
+
+        if user.full_name:
+            lines.append(f"User's name: {user.full_name}")
+
+        # Recent liked / purchased books
+        recent_interactions = (
+            self.db.query(UserInteraction, Book)
+            .join(Book, UserInteraction.book_id == Book.id)
+            .filter(
+                UserInteraction.user_id == user.id,
+                UserInteraction.interaction_type.in_(["like", "purchase"])
+            )
+            .order_by(UserInteraction.created_at.desc())
+            .limit(5)
+            .all()
+        )
+
+        if recent_interactions:
+            liked = [f'"{b.title}" by {b.author}' for _, b in recent_interactions]
+            lines.append(f"Books the user liked or purchased: {', '.join(liked)}")
+        else:
+            lines.append("The user has no reading history yet.")
+
+        has_preferences = user.preferences_vector is not None
+        lines.append(
+            "The user has a personalized preference profile."
+            if has_preferences
+            else "The user is new and has not built a preference profile yet."
+        )
+
+        return "\n".join(lines)
+
     async def decide_recommendation_strategy(
         self,
         message: str,
