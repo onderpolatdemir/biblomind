@@ -16,6 +16,7 @@ export default function CheckoutPage() {
     const { user } = useAuth();
     const [isProcessing, setIsProcessing] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
+    const [recommendations, setRecommendations] = useState<any[]>([]);
     const router = useRouter();
 
     const handleAddressSelect = (address: Address) => {
@@ -101,6 +102,28 @@ export default function CheckoutPage() {
             refreshCart();
         }
     }, [router, refreshCart]);
+
+    useEffect(() => {
+        if (cart && cart.items.length > 0) {
+            const cartBookIds = cart.items.map(i => i.book?.id).filter(Boolean);
+            if (cartBookIds.length > 0) {
+                fetch("http://localhost:8000/api/recommendations/checkout", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(cartBookIds)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.recommendations) {
+                        setRecommendations(data.recommendations);
+                    }
+                })
+                .catch(err => console.error("Error fetching checkout recommendations:", err));
+            }
+        }
+    }, [cart]);
 
     if (isLoading) {
         return (
@@ -254,6 +277,44 @@ export default function CheckoutPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Frequently Bought Together / Recommendations */}
+                {recommendations.length > 0 && (
+                    <div className="mt-16 animate-fade-in">
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold font-heading text-text flex items-center md:justify-start justify-center gap-2">
+                                You Might Also Like
+                            </h2>
+                            <p className="text-sm text-gray-500 text-center md:text-left mt-1">
+                                Add these highly recommended books to your current order
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                            {recommendations.map((rec) => (
+                                <Link 
+                                    key={rec.book.id} 
+                                    href={`/books/${rec.book.id}`} 
+                                    className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-lg transition-all duration-300 group"
+                                >
+                                    <div className="relative w-28 h-40 md:w-32 md:h-48 flex-shrink-0 bg-gray-50 rounded-lg overflow-hidden mb-4 shadow-sm group-hover:shadow-md transition-shadow">
+                                        <Image
+                                            src={rec.book.cover_url || "/book-placeholder.jpg"}
+                                            alt={rec.book.title}
+                                            fill
+                                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-text mb-1 w-full truncate text-center group-hover:text-primary transition-colors">{rec.book.title}</h3>
+                                    <p className="text-xs text-gray-500 mb-2 truncate text-center w-full">{rec.book.author}</p>
+                                    <div className="text-sm font-bold text-accent mb-3">${Number(rec.book.price).toFixed(2)}</div>
+                                    <div className="mt-auto text-[11px] text-gray-500 text-center px-2 bg-blue-50/50 rounded-md py-2 line-clamp-3 w-full border border-blue-100/50 italic leading-relaxed">
+                                        "{rec.explanation}"
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </main>
 
             <AddressModal

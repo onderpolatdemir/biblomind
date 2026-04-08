@@ -1,9 +1,9 @@
 """API endpoints for personalized recommendations."""
 
 import logging
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -249,4 +249,47 @@ async def refresh_preference_vector(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update preference vector"
+        )
+
+
+@router.post(
+    "/checkout",
+    response_model=RecommendationsListResponse,
+    summary="Get checkout recommendations",
+    description="Get recommendations based on items in the cart utilizing Apriori Association Rules and Content Fallback."
+)
+async def get_checkout_recommendations(
+    cart_book_ids: List[UUID] = Body(..., description="List of book UUIDs currently in the cart"),
+    limit: int = Query(default=5, ge=1, le=10, description="Max recommendations to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get recommendations for the checkout page.
+    """
+    try:
+        logger.info(f"POST /api/recommendations/checkout - Cart size: {len(cart_book_ids)}")
+        
+        if not cart_book_ids:
+            return {"recommendations": [], "total": 0, "strategy": "empty_cart"}
+            
+        rec_service = RecommendationService(db)
+        result = await rec_service.get_checkout_recommendations(
+            cart_book_ids=cart_book_ids,
+            limit=limit
+        )
+        
+        await rec_service.close()
+        return result
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error generating checkout recommendations: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate checkout recommendations"
         )
