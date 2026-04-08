@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 class LangChainHelper:
     """Helper class for LangChain operations."""
-    
+
     def __init__(self):
         """Initialize LangChain components."""
         # Validate API key
         if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "your-openai-api-key":
             logger.error("OPENAI_API_KEY not configured!")
             raise ValueError("OPENAI_API_KEY must be configured in .env file")
-        
+
         # Initialize ChatOpenAI for conversations with timeout
         self.chat_model = ChatOpenAI(
             model=settings.OPENAI_LLM_MODEL,
@@ -30,7 +30,7 @@ class LangChainHelper:
             timeout=30,  # 30 second timeout
             max_retries=2
         )
-        
+
         # Initialize OpenAI embeddings with timeout
         self.embeddings = OpenAIEmbeddings(
             model=settings.OPENAI_EMBEDDING_MODEL,
@@ -39,7 +39,7 @@ class LangChainHelper:
             timeout=30,  # 30 second timeout
             max_retries=2
         )
-        
+
         logger.info("LangChain helper initialized")
     
     @staticmethod
@@ -50,28 +50,28 @@ class LangChainHelper:
         Returns:
             ChatPromptTemplate for recommendations
         """
-        system_template = """Sen BiblioMind AI asistanısın. Kullanıcılara kitap önerileri yapıyorsun.
-Görevin, neden bir kitabı önerdiğini kısa, net ve empatik bir şekilde açıklamak.
-Açıklamalar 2-3 cümle olmalı, samimi ve kişiselleştirilmiş olmalı.
-Türkçe yazmalısın.
+        system_template = """You are the BiblioMind AI assistant. You make book recommendations to users.
+Your task is to explain, briefly, clearly, and empathetically, why a book is being recommended.
+Explanations should be 2-3 sentences, warm, and personalized.
+You must write in English.
 
-Kullanıcı profili ve tercihlerini dikkate al.
-Kitabın özellikleriyle kullanıcının ilgi alanlarını eşleştir.
-Spesifik örnekler ver ve genel konuşma."""
-        
-        human_template = """Kullanıcı profili:
-- Sevdiği türler: {favorite_genres}
-- Okuma seviyesi: {reading_level}
-- Favori yazarlar: {favorite_authors}
+Consider the user's profile and preferences.
+Match the book's features with the user's interests.
+Give specific examples — do not speak in generalities."""
 
-Önerilen kitap:
-- Başlık: {book_title}
-- Yazar: {book_author}
-- Tür: {book_genre}
-- Açıklama: {book_description}
-- Eşleşme skoru: %{match_score}
+        human_template = """User profile:
+- Favorite genres: {favorite_genres}
+- Reading level: {reading_level}
+- Favorite authors: {favorite_authors}
 
-Bu kitabı neden önerdiğini kullanıcıya açıkla. Kısa ve samimi ol."""
+Recommended book:
+- Title: {book_title}
+- Author: {book_author}
+- Genre: {book_genre}
+- Description: {book_description}
+- Match score: {match_score}%
+
+Explain to the user why you're recommending this book. Keep it short and friendly."""
         
         system_message = SystemMessagePromptTemplate.from_template(system_template)
         human_message = HumanMessagePromptTemplate.from_template(human_template)
@@ -86,16 +86,16 @@ Bu kitabı neden önerdiğini kullanıcıya açıkla. Kısa ve samimi ol."""
         Returns:
             System prompt string
         """
-        return """Sen BiblioMind AI asistanısın, kullanıcılara kitap önerileri yapıyorsun.
-Özelliklerin:
-- Samimi ve yardımsever
-- Kitaplar hakkında bilgili
-- Kullanıcı tercihlerini dinleyen
-- Spesifik ve net öneriler veren
-- Türkçe konuşan
+        return """You are the BiblioMind AI assistant, making book recommendations to users.
+Your traits:
+- Warm and helpful
+- Knowledgeable about books
+- Attentive to user preferences
+- Gives specific, clear recommendations
+- Speaks English
 
-Kullanıcının sorularını yanıtla, kitap öner ve okuma alışkanlıklarını geliştirmesine yardımcı ol.
-Kısa ve öz cevaplar ver (2-3 cümle)."""
+Answer the user's questions, recommend books, and help them improve their reading habits.
+Keep answers short and concise (2-3 sentences)."""
     
     async def generate_chat_response(
         self,
@@ -139,7 +139,7 @@ Kısa ve öz cevaplar ver (2-3 cümle)."""
             
         except Exception as e:
             logger.error(f"Error generating chat response: {e}")
-            return "Üzgünüm, şu an bir hata oluştu. Lütfen tekrar deneyin."
+            return "Sorry, something went wrong. Please try again."
     
     async def embed_text(self, text: str) -> List[float]:
         """
@@ -185,26 +185,27 @@ Kısa ve öz cevaplar ver (2-3 cümle)."""
         Returns:
             System prompt string optimized for RAG context
         """
-        return """Sen BiblioMind AI kitap asistanısın. Kullanıcılara kitap önerir ve sorularını yanıtlarsın.
+        return """You are the BiblioMind AI book assistant. You recommend books to users and answer their questions.
 
-DAVRANIŞLARIN:
-- Ana odak: Kitap önerileri ve kitaplar hakkında Q&A
-- Konuyu kitaplara çekmeye çalış ama zorla değil
-- Out-of-topic sorulara da cevap verebilirsin (kısıtlı genel sohbet)
-- Kullanıcıyı kitap keşfine yönlendir
+YOUR BEHAVIOR:
+- Primary focus: Book recommendations and Q&A about books
+- Try to steer conversations toward books, but not forcefully
+- You may answer off-topic questions too (limited general chat)
+- Guide the user toward discovering books
 
-KURALLARI:
-- Context'teki kitaplardan bahset (varsa)
-- Spesifik kitap öner, genel konuşma
-- Kısa ve net cevaplar (2-3 paragraf max)
-- Türkçe konuş
-- Hallüsinasyon yapma, context'te yoksa "bilmiyorum" de veya alternatif öner"""
+YOUR RULES:
+- Mention books from the context (if any)
+- Recommend specific books — do not speak in generalities
+- Keep answers short and clear (2-3 paragraphs max)
+- Speak in English
+- Do not hallucinate — if not in context, say "I don't know" or suggest an alternative"""
     
     async def generate_rag_response(
         self,
         user_message: str,
         context: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        user_context: Optional[str] = None
     ) -> str:
         """
         Generate chatbot response with RAG context.
@@ -228,7 +229,11 @@ KURALLARI:
             # System prompt with RAG behavior
             system_content = self.create_rag_system_prompt()
             messages.append(SystemMessage(content=system_content))
-            
+
+            # Inject user profile so the LLM can personalize its response
+            if user_context:
+                messages.append(SystemMessage(content=f"USER PROFILE:\n{user_context}"))
+
             # Add RAG context as a system message
             if context:
                 context_message = f"\n\n{context}"
@@ -260,7 +265,7 @@ KURALLARI:
             
         except Exception as e:
             logger.error(f"Error generating RAG response: {e}")
-            return "Üzgünüm, şu an bir hata oluştu. Lütfen tekrar deneyin."
+            return "Sorry, something went wrong. Please try again."
     
     async def generate_conversation_title(
         self,
@@ -278,13 +283,13 @@ KURALLARI:
             Generated title (3-5 words)
         """
         try:
-            prompt = f"""Aşağıdaki kullanıcı mesajından kısa ve öz bir başlık oluştur.
-Başlık en fazla 3-5 kelime olmalı ve konuyu özetlemeli.
-Sadece başlığı yaz, başka bir şey ekleme.
+            prompt = f"""Generate a short, concise title from the user message below.
+The title must be at most 3-5 words and summarize the topic.
+Write only the title — nothing else.
 
-Kullanıcı mesajı: "{first_message}"
+User message: "{first_message}"
 
-Başlık:"""
+Title:"""
             
             # Generate title
             response = await self.chat_model.agenerate([[HumanMessage(content=prompt)]])
@@ -331,7 +336,7 @@ async def generate_recommendation_explanation(
     # Format prompt
     messages = prompt_template.format_messages(
         favorite_genres=", ".join(user_profile.get("favorite_genres", [])),
-        reading_level=user_profile.get("reading_level", "orta"),
+        reading_level=user_profile.get("reading_level", "intermediate"),
         favorite_authors=", ".join(user_profile.get("favorite_authors", [])),
         book_title=book.get("title", ""),
         book_author=book.get("author", ""),
@@ -365,14 +370,14 @@ async def chat_with_context(
     
     # Enhance system prompt with user context
     context_info = f"""
-Kullanıcı hakkında:
-- Favori türler: {', '.join(user_context.get('favorite_genres', []))}
-- Son okunan kitaplar: {', '.join(user_context.get('recent_books', [])[:3])}
+About the user:
+- Favorite genres: {', '.join(user_context.get('favorite_genres', []))}
+- Recently read books: {', '.join(user_context.get('recent_books', [])[:3])}
 """
-    
+
     # Prepend context to first message if no history
     if not conversation_history:
-        enhanced_message = f"{context_info}\n\nKullanıcı: {message}"
+        enhanced_message = f"{context_info}\n\nUser: {message}"
     else:
         enhanced_message = message
     

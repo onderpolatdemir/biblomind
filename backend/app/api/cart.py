@@ -1,7 +1,8 @@
+import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select
 
@@ -9,9 +10,26 @@ from app.api import deps
 from app.models.cart import Cart, CartItem
 from app.models.book import Book
 from app.models.user import User
+from app.models.user_interaction import UserInteraction
+from app.services.recommendation_service import RecommendationService
 from app.schemas import cart as schemas
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+async def _update_user_vector_background(db: Session, user_id: UUID):
+    try:
+        rec_service = RecommendationService(db)
+        result = await rec_service.update_user_preference_vector(user_id)
+        await rec_service.close()
+        logger.info(
+            f"Cart background task: Vector updated={result['vector_updated']}, "
+            f"Interactions processed={result['interactions_processed']}"
+        )
+    except Exception as e:
+        logger.error(f"Cart background vector update failed: {e}")
 
 # Helper function
 def _delete_pending_order_if_cart_empty(user_id: UUID, db: Session):
@@ -58,14 +76,16 @@ def get_cart(
     return cart
 
 @router.post("/add", response_model=schemas.Cart)
-def add_to_cart(
+async def add_to_cart(
     item_in: schemas.CartItemCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     Add a book to the cart.
     If book already exists in cart, increments quantity.
+    Records a 'cart' interaction for preference vector updates.
     """
     # 1. Get or create cart
     query = select(Cart).where(Cart.user_id == current_user.id)
@@ -104,10 +124,31 @@ def add_to_cart(
         )
         db.add(new_item)
         
+    # 4. Record 'cart' interaction if not already exists (for preference vector)
+    existing_interaction = db.query(UserInteraction).filter(
+        UserInteraction.user_id == current_user.id,
+        UserInteraction.book_id == item_in.book_id,
+        UserInteraction.interaction_type == "cart"
+    ).first()
+
+    if not existing_interaction:
+        interaction = UserInteraction(
+            user_id=current_user.id,
+            book_id=item_in.book_id,
+            interaction_type="cart"
+        )
+        db.add(interaction)
+
     db.commit()
-    
-    # 4. Return updated cart with all items loaded
-    # We re-fetch to ensure relationships are loaded properly
+
+    # 5. Trigger preference vector update in background
+    background_tasks.add_task(
+        _update_user_vector_background,
+        db=db,
+        user_id=current_user.id,
+    )
+
+    # 6. Return updated cart with all items loaded
     refresh_query = select(Cart).where(Cart.id == cart.id).options(
         joinedload(Cart.items).joinedload(CartItem.book)
     )

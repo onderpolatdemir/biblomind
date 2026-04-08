@@ -334,31 +334,32 @@ class VisionService:
         
         logger.info(f"Detected {len(raw_texts)} raw texts from OCR")
         
-        # Step 2: OpenAI ile kitap isimlerini düzelt ve normalize et
-        prompt = f"""Aşağıdaki OCR sonuçları bir kitap rafından 4 farklı açıdan (0, 90, 180, 270 derece) alınmıştır.
-Aynı kitaplar farklı yönlerde tekrar edebilir veya tek bir kitap ismi birden fazla satıra bölünmüş olabilir (örn: 'The Modern\\nFundamentals of Golf').
-Tüm metni bütüncül olarak analiz et ve GERÇEKTEN BİR KİTAP ADI veya YAZAR İSMİ olanları benzersiz (tekrarsız) bir liste olarak çıkar.
+        # Step 2: Use OpenAI to clean and normalize book names
+        prompt = f"""The OCR results below were captured from a bookshelf at 4 different angles (0, 90, 180, 270 degrees).
+The same books may repeat in different orientations, or a single book title may be split across multiple lines (e.g., 'The Modern\\nFundamentals of Golf').
+Analyze the entire text holistically and produce a unique (deduplicated) list of items that are REALLY BOOK TITLES or AUTHOR NAMES.
 
-LÜTFEN 'genres' ALANINI AŞAĞIDAKİ GEÇERLİ İNGİLİZCE KATEGORİLERDEN BİR VEYA BİRKAÇI İLE DOLDUR (Türkçe KULLANMA):
+PLEASE FILL THE 'genres' FIELD WITH ONE OR MORE OF THE FOLLOWING VALID ENGLISH CATEGORIES (DO NOT use other languages):
 [Action, Adventure, Fiction, Non Fiction, Science Fiction, Fantasy, Crime, Mythology, Dystopia, Mystery, Thriller, Romance, Biography, History, Science, Self Help, Poetry, Children, Young Adult, Classics, Suspense]
 
-OCR Sonuçları:
+OCR results:
 {chr(10).join(raw_texts)}
 
-Her tespit edilen benzersiz kitap için şu formatta JSON döndür:
+For each unique detected book, return JSON in this format:
 {{
-  "title": "Kitap Adı",
-  "author": "Yazar Adı (eğer tespit edildiyse)",
+  "title": "Book Title",
+  "author": "Author Name (if detected)",
   "confidence": 0.9,
   "genres": ["Fantasy", "Classics"],
-  "original_ocr": "orijinal OCR text"
+  "original_ocr": "original OCR text"
 }}
 
-Önemli:
-- Kitap adları iki satıra bölünmüşse onları akıllıca birleştir.
-- Aynı kitap OCR dizilerinde birkaç kez geçse bile JSON'da sadece BİR KERE yer almalı (en doğru yazılışı seç).
-- Kitap adı değilse (barkod, numara, yayınevi logosu vb.), dahil etme.
-- Sadece JSON array döndür, başka açıklama yapma.
+Important:
+- If a book title is split across two lines, merge them intelligently.
+- Even if the same book appears multiple times in the OCR sequences, it must appear ONLY ONCE in the JSON (pick the most accurate spelling).
+- If something is not a book title (barcode, number, publisher logo, etc.), do not include it.
+- Return only the JSON array — no other explanation.
+- All textual fields in the output must be in English.
 
 JSON array:"""
         
@@ -430,40 +431,42 @@ JSON array:"""
         
         logger.info(f"Matching {len(detected_books)} books to user profile")
         
-        # Step 1: OpenAI ile kitapları kullanıcı profiline göre skorla
-        prompt = f"""Kullanıcı Okuma Profili: {json.dumps(user_profile, ensure_ascii=False, indent=2)}
-Kitaplıktaki Kitaplar: {json.dumps(detected_books[:30], ensure_ascii=False, indent=2)}
+        # Step 1: Score books against the user profile with OpenAI
+        prompt = f"""User Reading Profile: {json.dumps(user_profile, ensure_ascii=False, indent=2)}
+Books on the shelf: {json.dumps(detected_books[:30], ensure_ascii=False, indent=2)}
 
-Senden iki şey bekliyorum:
-1) Rafa bakarak raf sahibinin okuma analizi
-2) Eğer Kullanıcı Okuma Profilinde 'has_history': true ise, bu kitaplıktan kullanıcıya BAŞKA KİTAPLAR öner (match_score ve reason ile). Eğer 'has_history': false ise, YANİ kullanıcının profil geçmişi yoksa KESİNLİKLE hiçbir kitap önerme (recommendations listesi BOŞ OLSUN []). Geçmişi olmayan kullanıcıya kitaba göre öneri yapamayız.
+I expect two things from you:
+1) A reading analysis of the shelf owner based on the shelf
+2) If the User Reading Profile has 'has_history': true, recommend OTHER BOOKS from this shelf to the user (with match_score and reason). If 'has_history': false — i.e., the user has no profile history — you MUST NOT recommend any book (the recommendations list MUST BE EMPTY []). We cannot make book-based recommendations for a user with no history.
 
-Raf analizi için şunları dikkate al:
-- Raftaki genel türler neler?
-- Raf sahibinin okuma tarzı nasıl?
-- Kullanıcı ile raf uyumluluğu ne kadar? (geçmiş yoksa 0.5 ver)
-ÖNEMLİ: 'dominant_genres' listesi, SADECE AŞAĞIDAKİ İNGİLİZCE LİSTEDEN SEÇİLEN türleri içermelidir:
+For the shelf analysis, consider:
+- What are the general genres on the shelf?
+- What is the shelf owner's reading style?
+- How compatible is the user with the shelf? (if no history, use 0.5)
+IMPORTANT: The 'dominant_genres' list MUST contain ONLY genres picked from the ENGLISH LIST BELOW:
 [Action, Adventure, Fiction, Non Fiction, Science Fiction, Fantasy, Crime, Mythology, Dystopia, Mystery, Thriller, Romance, Biography, History, Science, Self Help, Poetry, Children, Young Adult, Classics, Suspense]
 
-JSON formatında döndür:
+ALL TEXTUAL FIELDS IN THE OUTPUT (reason, reading_style, etc.) MUST BE WRITTEN IN ENGLISH.
+
+Return JSON in this format:
 {{
   "recommendations": [
     {{
-      "title": "Kitap Adı",
-      "author": "Yazar",
+      "title": "Book Title",
+      "author": "Author",
       "match_score": 0.95,
-      "reason": "Neden öneriliyor açıklama"
+      "reason": "Explanation of why it is recommended (in English)"
     }}
   ],
   "shelf_analysis": {{
     "dominant_genres": ["Fantasy", "Classics"],
-    "reading_style": "Raf sahibinin okuma tarzı açıklaması",
+    "reading_style": "Description of the shelf owner's reading style (in English)",
     "user_compatibility": 0.5
   }}
 }}
 
-Tekrar Ediyorum: Profil 'has_history': false ise "recommendations": [] olmalı.
-Sadece match_score > 0.6 olanları dahil et ve score'a göre sıralı döndür. Sadece JSON döndür:"""
+Reminder: If the profile has 'has_history': false, then "recommendations": [] must be empty.
+Include only items with match_score > 0.6 and return them sorted by score. Return only JSON:"""
         
         try:
             response = await openai_service.generate_completion(

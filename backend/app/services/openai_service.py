@@ -317,26 +317,26 @@ class OpenAIService:
             raise ValueError("Book must have title and author")
         
         # Build system prompt
-        system_prompt = """Sen BiblioMind AI asistanısın. Kullanıcılara kitap önerileri yapıyorsun.
-Görevin, neden bir kitabı önerdiğini kısa, net ve empatik bir şekilde açıklamak.
-Açıklamalar 2-3 cümle olmalı, samimi ve kişiselleştirilmiş olmalı.
-Türkçe yazmalısın."""
-        
+        system_prompt = """You are the BiblioMind AI assistant. You make book recommendations to users.
+Your task is to explain, briefly, clearly, and empathetically, why a book is being recommended.
+Explanations should be 2-3 sentences, warm, and personalized.
+You must write in English."""
+
         # Build user prompt with context
-        user_genres = ", ".join(user_profile.get("favorite_genres", ["çeşitli"]))
+        user_genres = ", ".join(user_profile.get("favorite_genres", ["various"]))
         match_score_percent = int(context.get("match_score", 0) * 100)
-        
-        user_prompt = f"""Kullanıcı profili:
-- Sevdiği türler: {user_genres}
-- Okuma seviyesi: {user_profile.get("reading_level", "orta")}
 
-Önerilen kitap:
-- Başlık: {book.get("title")}
-- Yazar: {book.get("author")}
-- Tür: {book.get("genre", "Genel")}
-- Eşleşme skoru: %{match_score_percent}
+        user_prompt = f"""User profile:
+- Favorite genres: {user_genres}
+- Reading level: {user_profile.get("reading_level", "intermediate")}
 
-Bu kitabı neden önerdiğini kullanıcıya açıkla. Kısa ve samimi ol."""
+Recommended book:
+- Title: {book.get("title")}
+- Author: {book.get("author")}
+- Genre: {book.get("genre", "General")}
+- Match score: {match_score_percent}%
+
+Explain to the user why you're recommending this book. Keep it short and friendly."""
         
         try:
             # Call OpenAI API
