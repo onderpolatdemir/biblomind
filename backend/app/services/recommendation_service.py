@@ -416,6 +416,13 @@ class RecommendationService:
         # Increase candidate pool to find more diverse matches (author/genre)
         results = query.order_by('distance').limit(limit * 10).all()
         
+        # Get user preferences
+        user_prefs = {}
+        try:
+            user_prefs = await UserService.get_user_reading_profile(self.db, user.id, self.openai_service)
+        except Exception as e:
+            logger.warning(f"Could not load user_prefs for user {user.id}: {e}")
+
         # Format results
         recommendations = []
         for book, distance in results:
