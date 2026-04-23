@@ -11,6 +11,7 @@ from app.models.conversation import Conversation, ConversationMessage
 from app.models.user_connection import UserConnection
 from app.models.review import Review
 from app.models.shelf_analysis import ShelfAnalysis
+from app.models.association_rule import AssociationRule
 
 __all__ = [
     "User",
@@ -27,5 +28,6 @@ __all__ = [
     "ConversationMessage",
     "UserConnection",
     "Review",
-    "ShelfAnalysis"
+    "ShelfAnalysis",
+    "AssociationRule"
 ]
