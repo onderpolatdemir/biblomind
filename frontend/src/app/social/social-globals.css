@@ -1,0 +1,286 @@
+/* ── BiblioMind Social — Dark Theme ── */
+
+/* CSS Variables for the social section */
+.social-theme {
+    --social-bg: #0f0f0f;
+    --social-bg-secondary: #1a1a1a;
+    --social-card: #1a1a1a;
+    --social-card-hover: #222222;
+    --social-card-elevated: #242424;
+    --social-border: #2a2a2a;
+    --social-border-light: #333333;
+    --social-text: #f0f0f0;
+    --social-text-secondary: #b0b0b0;
+    --social-text-muted: #888888;
+    --social-accent: #f5c518;
+    --social-accent-hover: #ffd54f;
+    --social-accent-dim: rgba(245, 197, 24, 0.15);
+    --social-success: #4caf50;
+    --social-danger: #ef4444;
+    --social-danger-dim: rgba(239, 68, 68, 0.15);
+}
+
+/* Base social page styling */
+.social-theme {
+    background-color: var(--social-bg);
+    color: var(--social-text);
+    min-height: 100vh;
+}
+
+/* Custom scrollbar for dark theme */
+.social-theme ::-webkit-scrollbar {
+    width: 6px;
+}
+
+.social-theme ::-webkit-scrollbar-track {
+    background: var(--social-bg-secondary);
+}
+
+.social-theme ::-webkit-scrollbar-thumb {
+    background: var(--social-border-light);
+    border-radius: 3px;
+}
+
+.social-theme ::-webkit-scrollbar-thumb:hover {
+    background: var(--social-text-muted);
+}
+
+/* Social card base */
+.social-card {
+    background-color: var(--social-card);
+    border: 1px solid var(--social-border);
+    border-radius: 16px;
+    transition: all 0.2s ease;
+}
+
+.social-card:hover {
+    background-color: var(--social-card-hover);
+    border-color: var(--social-border-light);
+}
+
+/* Glass effect for elevated cards */
+.social-card-glass {
+    background: linear-gradient(
+        135deg,
+        rgba(26, 26, 26, 0.9) 0%,
+        rgba(36, 36, 36, 0.7) 100%
+    );
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+}
+
+/* Social input styling */
+.social-input {
+    background-color: var(--social-bg-secondary);
+    border: 1px solid var(--social-border);
+    color: var(--social-text);
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.social-input:focus {
+    outline: none;
+    border-color: var(--social-accent);
+    box-shadow: 0 0 0 3px var(--social-accent-dim);
+}
+
+.social-input::placeholder {
+    color: var(--social-text-muted);
+}
+
+/* Social textarea */
+.social-textarea {
+    background-color: var(--social-bg-secondary);
+    border: 1px solid var(--social-border);
+    color: var(--social-text);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.social-textarea:focus {
+    outline: none;
+    border-color: var(--social-accent);
+    box-shadow: 0 0 0 3px var(--social-accent-dim);
+}
+
+.social-textarea::placeholder {
+    color: var(--social-text-muted);
+}
+
+/* Social button primary */
+.social-btn-primary {
+    background-color: var(--social-accent);
+    color: #000;
+    font-weight: 700;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.social-btn-primary:hover {
+    background-color: var(--social-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 197, 24, 0.3);
+}
+
+.social-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Social button outline */
+.social-btn-outline {
+    background: transparent;
+    color: var(--social-text);
+    font-weight: 600;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    border: 1px solid var(--social-border-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.social-btn-outline:hover {
+    border-color: var(--social-accent);
+    color: var(--social-accent);
+    background: var(--social-accent-dim);
+}
+
+/* Social tag */
+.social-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background-color: var(--social-card-elevated);
+    color: var(--social-text-secondary);
+    border: 1px solid var(--social-border);
+    transition: all 0.2s ease;
+}
+
+.social-tag:hover {
+    border-color: var(--social-accent);
+    color: var(--social-accent);
+}
+
+.social-tag-active {
+    background-color: var(--social-accent-dim);
+    color: var(--social-accent);
+    border-color: var(--social-accent);
+}
+
+/* Avatar ring accent */
+.avatar-ring {
+    border: 3px solid var(--social-accent);
+    border-radius: 50%;
+    padding: 2px;
+}
+
+/* Accent underline */
+.accent-underline {
+    position: relative;
+}
+
+.accent-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--social-accent);
+    border-radius: 2px;
+}
+
+/* Danger button */
+.social-btn-danger {
+    background: var(--social-danger-dim);
+    color: var(--social-danger);
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.social-btn-danger:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: var(--social-danger);
+}
+
+/* Image upload zone */
+.upload-zone {
+    border: 2px dashed var(--social-border-light);
+    border-radius: 16px;
+    background: var(--social-bg-secondary);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-zone:hover {
+    border-color: var(--social-accent);
+    background: var(--social-accent-dim);
+}
+
+/* Skeleton loader for dark theme */
+.social-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--social-card) 25%,
+        var(--social-card-hover) 50%,
+        var(--social-card) 75%
+    );
+    background-size: 200% 100%;
+    animation: socialShimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes socialShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* Role badges */
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.role-creator {
+    background: var(--social-accent-dim);
+    color: var(--social-accent);
+}
+
+.role-admin {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.role-moderator {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
