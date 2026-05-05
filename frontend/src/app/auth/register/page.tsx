@@ -27,7 +27,8 @@ export default function RegisterPage() {
             await api.post('/auth/register', {
                 email: data.email,
                 password: data.password,
-                full_name: data.fullName
+                full_name: data.fullName,
+                username: data.username,
             });
 
             setSubmitStatus('success');
@@ -100,6 +101,26 @@ export default function RegisterPage() {
                             placeholder="John Doe"
                         />
                         {errors.fullName && <span className="text-red-500 text-sm mt-1">Full name is required</span>}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-text mb-1">Username</label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium select-none">@</span>
+                            <input
+                                {...register("username", {
+                                    required: "Username is required",
+                                    minLength: { value: 3, message: "Username must be at least 3 characters" },
+                                    maxLength: { value: 50, message: "Username must be at most 50 characters" },
+                                    pattern: { value: /^[a-zA-Z0-9_]+$/, message: "Only letters, numbers and underscores" },
+                                })}
+                                type="text"
+                                disabled={isSubmitting}
+                                className="w-full pl-8 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all disabled:opacity-50"
+                                placeholder="johndoe"
+                            />
+                        </div>
+                        {errors.username && <span className="text-red-500 text-sm mt-1">{errors.username.message as string}</span>}
                     </div>
 
                     <div>

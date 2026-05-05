@@ -16,8 +16,11 @@ from app.core.rate_limit import init_rate_limiting
 from app.core.monitoring import init_sentry
 from app.api import api_router
 
-# Ensure static uploads directory exists
+# Ensure static uploads directories exist
 os.makedirs("static/uploads/shelves", exist_ok=True)
+os.makedirs("static/uploads/avatars", exist_ok=True)
+os.makedirs("static/uploads/posts", exist_ok=True)
+os.makedirs("static/uploads/communities", exist_ok=True)
 
 
 @asynccontextmanager

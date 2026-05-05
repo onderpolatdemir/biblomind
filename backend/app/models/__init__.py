@@ -11,6 +11,11 @@ from app.models.conversation import Conversation, ConversationMessage
 from app.models.user_connection import UserConnection
 from app.models.review import Review
 from app.models.shelf_analysis import ShelfAnalysis
+from app.models.community import (
+    Community, CommunityMember, CommunityRule, CommunityRelatedBook,
+    CommunityPost, PostComment, PostLike, CommentLike, PostSave, CommunityActivity
+)
+from app.models.notification import Notification
 
 __all__ = [
     "User",
@@ -27,5 +32,16 @@ __all__ = [
     "ConversationMessage",
     "UserConnection",
     "Review",
-    "ShelfAnalysis"
+    "ShelfAnalysis",
+    "Community",
+    "CommunityMember",
+    "CommunityRule",
+    "CommunityRelatedBook",
+    "CommunityPost",
+    "PostComment",
+    "PostLike",
+    "CommentLike",
+    "PostSave",
+    "CommunityActivity",
+    "Notification",
 ]

@@ -21,11 +21,48 @@ from app.schemas.social import (
     MyConnectionsResponse,
     MyConnectionItem,
     BlockResponse,
+    UserSearchResult,
+    UserSearchResponse,
 )
 from app.core.logging import logger
 
 
 router = APIRouter()
+
+
+@router.get("/search", response_model=UserSearchResponse)
+async def search_users(
+    q: str = Query(..., min_length=1, max_length=50, description="Username to search for"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Search users by username (partial match, case-insensitive).
+    Returns up to 10 results, excludes the current user.
+    """
+    results = (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.username.isnot(None),
+            User.username.ilike(f"%{q}%"),
+        )
+        .limit(10)
+        .all()
+    )
+
+    return UserSearchResponse(
+        results=[
+            UserSearchResult(
+                user_id=u.id,
+                username=u.username,
+                full_name=u.full_name,
+                avatar_url=u.avatar_url,
+            )
+            for u in results
+        ],
+        total=len(results),
+    )
 
 
 @router.get("/find-buddies", response_model=BookBuddyListResponse)

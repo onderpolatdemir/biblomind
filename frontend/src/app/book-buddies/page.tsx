@@ -2,14 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import Header from "@/components/layout/Header";
 import api from "@/lib/api";
-import { Users, BookOpen, X, UserPlus, CheckCircle, ChevronRight, ShieldAlert } from "lucide-react";
+import { Users, BookOpen, X, UserPlus, CheckCircle, ChevronRight, ShieldAlert, ExternalLink, Search } from "lucide-react";
 import Image from "next/image";
+
+const BACKEND_URL = "http://localhost:8000";
+
+interface UserSearchResult {
+    user_id: string;
+    username: string;
+    full_name?: string;
+    avatar_url?: string;
+}
 
 interface BuddyMatch {
     user_id: string;
     full_name: string;
+    username?: string;
+    avatar_url?: string;
     compatibility_score: number;
     shared_genres: string[];
     shared_books: number;
@@ -42,6 +54,12 @@ export default function BookBuddiesPage() {
     const [sharedInterests, setSharedInterests] = useState<SharedInterests | null>(null);
     const [buddyRecs, setBuddyRecs] = useState<BuddyRecommendation[]>([]);
     const [modalLoading, setModalLoading] = useState(false);
+
+    // Search state
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchConnectedIds, setSearchConnectedIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         fetchBuddies();
@@ -83,6 +101,26 @@ export default function BookBuddiesPage() {
             await api.post(`/social/connect/${userId}`);
         } catch { /* may already be connected */ }
         setConnectedIds((prev) => new Set(prev).add(userId));
+    };
+
+    const searchUsers = async (q: string) => {
+        if (!q.trim()) { setSearchResults([]); return; }
+        setSearchLoading(true);
+        try {
+            const res = await api.get(`/social/search?q=${encodeURIComponent(q.trim())}`);
+            setSearchResults(res.data.results ?? []);
+        } catch {
+            setSearchResults([]);
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    const connectFromSearch = async (userId: string) => {
+        try {
+            await api.post(`/social/connect/${userId}`);
+        } catch { /* may already be connected */ }
+        setSearchConnectedIds((prev) => new Set(prev).add(userId));
     };
 
     const blockBuddy = async (userId: string) => {
@@ -151,6 +189,77 @@ export default function BookBuddiesPage() {
                     </p>
                 </motion.div>
 
+                {/* Username Search */}
+                <div className="mb-10">
+                    <h2 className="text-lg font-heading font-bold text-text mb-3">Find a Reader by Username</h2>
+                    <div className="flex gap-3 max-w-md">
+                        <div className="relative flex-1">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    searchUsers(e.target.value);
+                                }}
+                                placeholder="Search by @username..."
+                                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Search Results */}
+                    {(searchLoading || searchResults.length > 0 || (searchQuery && !searchLoading)) && (
+                        <div className="mt-3 max-w-md bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            {searchLoading ? (
+                                <div className="flex items-center justify-center py-6">
+                                    <div className="w-5 h-5 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : searchResults.length === 0 ? (
+                                <p className="text-sm text-gray-400 text-center py-5">No users found for &quot;{searchQuery}&quot;</p>
+                            ) : (
+                                <ul className="divide-y divide-gray-50">
+                                    {searchResults.map((u) => (
+                                        <li key={u.user_id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-sm font-bold text-text flex-shrink-0">
+                                                    {u.avatar_url ? (
+                                                        <img
+                                                            src={u.avatar_url.startsWith("http") ? u.avatar_url : `${BACKEND_URL}${u.avatar_url}`}
+                                                            alt={u.username}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        u.full_name?.charAt(0)?.toUpperCase() ?? u.username.charAt(0).toUpperCase()
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-800">{u.full_name ?? u.username}</p>
+                                                    <p className="text-xs text-primary">@{u.username}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => connectFromSearch(u.user_id)}
+                                                className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all ${
+                                                    searchConnectedIds.has(u.user_id)
+                                                        ? "bg-green-100 text-green-700"
+                                                        : "bg-text text-white hover:bg-accent"
+                                                }`}
+                                            >
+                                                {searchConnectedIds.has(u.user_id) ? (
+                                                    <><CheckCircle size={12} /> Connected</>
+                                                ) : (
+                                                    <><UserPlus size={12} /> Connect</>
+                                                )}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Grid */}
                 {isLoading ? (
                     <div className="flex justify-center py-24">
@@ -177,8 +286,16 @@ export default function BookBuddiesPage() {
                             >
                                 {/* Avatar + Score */}
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className={`w-14 h-14 rounded-full border-2 flex items-center justify-center text-xl font-bold text-text ${scoreRing(buddy.compatibility_score)}`}>
-                                        {buddy.full_name?.charAt(0)?.toUpperCase() ?? "?"}
+                                    <div className={`w-14 h-14 rounded-full border-2 overflow-hidden flex items-center justify-center text-xl font-bold text-text ${scoreRing(buddy.compatibility_score)}`}>
+                                        {buddy.avatar_url ? (
+                                            <img
+                                                src={buddy.avatar_url.startsWith("http") ? buddy.avatar_url : `${BACKEND_URL}${buddy.avatar_url}`}
+                                                alt={buddy.full_name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            buddy.full_name?.charAt(0)?.toUpperCase() ?? "?"
+                                        )}
                                     </div>
                                     <div className="text-right">
                                         <p className={`text-lg font-bold ${scoreColor(buddy.compatibility_score)}`}>
@@ -188,9 +305,12 @@ export default function BookBuddiesPage() {
                                     </div>
                                 </div>
 
-                                <h3 className="font-heading font-bold text-gray-800 text-base mb-1 truncate">
+                                <h3 className="font-heading font-bold text-gray-800 text-base mb-0.5 truncate">
                                     {buddy.full_name}
                                 </h3>
+                                {buddy.username && (
+                                    <p className="text-xs text-primary mb-1">@{buddy.username}</p>
+                                )}
 
                                 {/* Shared genres */}
                                 {buddy.shared_genres?.length > 0 && (
@@ -305,14 +425,31 @@ export default function BookBuddiesPage() {
                             {/* Modal Header */}
                             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-lg font-bold text-text">
-                                        {selectedBuddy.full_name?.charAt(0)?.toUpperCase() ?? "?"}
+                                    <div className="w-12 h-12 bg-secondary rounded-full overflow-hidden flex items-center justify-center text-lg font-bold text-text">
+                                        {selectedBuddy.avatar_url ? (
+                                            <img
+                                                src={selectedBuddy.avatar_url.startsWith("http") ? selectedBuddy.avatar_url : `${BACKEND_URL}${selectedBuddy.avatar_url}`}
+                                                alt={selectedBuddy.full_name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            selectedBuddy.full_name?.charAt(0)?.toUpperCase() ?? "?"
+                                        )}
                                     </div>
                                     <div>
                                         <h2 className="font-heading font-bold text-gray-800 text-lg">{selectedBuddy.full_name}</h2>
                                         <p className={`text-sm font-bold ${scoreColor(selectedBuddy.compatibility_score)}`}>
                                             {fmtScore(selectedBuddy.compatibility_score)} reading match
                                         </p>
+                                        {selectedBuddy.username && (
+                                            <Link
+                                                href={`/profile/${selectedBuddy.username}`}
+                                                onClick={() => setSelectedBuddy(null)}
+                                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                                            >
+                                                <ExternalLink size={10} /> View Profile
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
                                 <button onClick={() => setSelectedBuddy(null)} className="text-gray-400 hover:text-red-500 transition-colors">

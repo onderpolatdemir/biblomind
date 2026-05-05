@@ -358,7 +358,7 @@ function MyScansTab() {
 /* ─── Profile Page ───────────────────────────────────────────────── */
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, logout, login } = useAuth();
+    const { user, logout, login, updateUser } = useAuth();
     const [activeTab, setActiveTab] = useState<"info" | "address" | "orders" | "reviews" | "connections" | "scans" | "potential">("info");
     const [refreshing, setRefreshing] = useState(false);
     const [refreshDone, setRefreshDone] = useState(false);
@@ -419,10 +419,19 @@ export default function ProfilePage() {
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-24">
                             {/* User Brief */}
                             <div className="p-6 bg-primary/5 border-b border-gray-100 text-center">
-                                <div className="w-20 h-20 bg-secondary rounded-full mx-auto flex items-center justify-center text-2xl font-bold text-text mb-3 border-4 border-white shadow-sm">
-                                    {user.full_name?.charAt(0).toUpperCase() || "U"}
+                                <div className="w-20 h-20 rounded-full mx-auto mb-3 border-4 border-white shadow-sm overflow-hidden bg-secondary flex items-center justify-center">
+                                    {user.avatar_url ? (
+                                        <img
+                                            src={user.avatar_url.startsWith("http") ? user.avatar_url : `http://localhost:8000${user.avatar_url}`}
+                                            alt="avatar"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="text-2xl font-bold text-text">{user.full_name?.charAt(0).toUpperCase() || "U"}</span>
+                                    )}
                                 </div>
                                 <h2 className="font-bold text-gray-800 truncate">{user.full_name}</h2>
+                                {user.username && <p className="text-xs text-primary font-medium">@{user.username}</p>}
                                 <p className="text-sm text-gray-500 truncate">{user.email}</p>
                             </div>
 
@@ -478,7 +487,7 @@ export default function ProfilePage() {
                             transition={{ duration: 0.3 }}
                         >
                             {activeTab === "info" && (
-                                <ProfileInfo user={user} onUpdate={() => { }} />
+                                <ProfileInfo user={user} onUpdate={(updated) => updateUser(updated)} />
                             )}
                             {activeTab === "address" && <AddressManager />}
                             {activeTab === "orders" && <OrderHistory />}

@@ -11,8 +11,10 @@ import ExpandableSearchBar from "@/components/expandable-search-bar";
 import {
     Book, Brain, Rocket, Sparkles, Search, ShoppingCart,
     Ghost, Heart, PenTool, Landmark, FlaskConical, House, LayoutGrid, Info,
-    Leaf, Feather, Baby, User, Scroll, Camera, Users, ShoppingBag, LayoutDashboard
+    Leaf, Feather, Baby, User, Scroll, Camera, Users, ShoppingBag, LayoutDashboard,
+    Bell, Globe
 } from "lucide-react";
+import api from "@/lib/api";
 import { CATEGORIES } from "@/lib/constants"; // Shared constants
 
 
@@ -25,8 +27,11 @@ export default function Header() {
     const cartCount = cart?.total_items || 0;
     const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [searchResults, setSearchResults] = useState<{ id: string; title: string }[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifications, setNotifications] = useState<any[]>([]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -45,6 +50,54 @@ export default function Header() {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Notification polling — every 30s
+    useEffect(() => {
+        if (!user) return;
+        const fetchCount = async () => {
+            try {
+                const res = await api.get("/notifications/unread-count");
+                setUnreadCount(res.data.count);
+            } catch {}
+        };
+        fetchCount();
+        const interval = setInterval(fetchCount, 30_000);
+        return () => clearInterval(interval);
+    }, [user]);
+
+    const openNotifications = async () => {
+        setIsNotifOpen(!isNotifOpen);
+        if (!isNotifOpen) {
+            try {
+                const res = await api.get("/notifications/?limit=10");
+                setNotifications(res.data);
+            } catch {}
+        }
+    };
+
+    const markAllRead = async () => {
+        try {
+            await api.put("/notifications/read-all");
+            setUnreadCount(0);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch {}
+    };
+
+    const dismissNotification = async (n: any) => {
+        setNotifications(prev => prev.filter(x => x.id !== n.id));
+        if (!n.is_read) setUnreadCount(c => Math.max(0, c - 1));
+        try { await api.delete(`/notifications/${n.id}`); } catch {}
+    };
+
+    const handleJoinRequestApprove = async (n: any) => {
+        try { await api.post(`/communities/join-requests/${n.entity_id}/approve`); } catch {}
+        await dismissNotification(n);
+    };
+
+    const handleJoinRequestReject = async (n: any) => {
+        try { await api.post(`/communities/join-requests/${n.entity_id}/reject`); } catch {}
+        await dismissNotification(n);
+    };
 
     const handleSearchChange = useCallback(async (query: string) => {
         if (query.length < 3) {
@@ -181,6 +234,12 @@ export default function Header() {
                         Book Buddies
                     </div>
                 </Link>
+                <Link href="/social" className="hover:text-primary transition-colors py-4">
+                    <div className="flex items-center gap-1">
+                        <Globe />
+                        Social
+                    </div>
+                </Link>
                 <Link href="/recommendations" className="hover:text-primary transition-colors py-4">
                     <div className="flex items-center gap-1">
                         <Sparkles />
@@ -209,28 +268,121 @@ export default function Header() {
                     />
                     <Link
                         href="/checkout"
-                        className="relative w-10 h-10 flex items-center justify-center rounded-full 
-                        border border-gray-200 bg-primary 
-                        hover:border-primary hover:text-white 
+                        className="relative w-10 h-10 flex items-center justify-center rounded-full
+                        border border-gray-200 bg-primary
+                        hover:border-primary hover:text-white
                         transition-all shadow-sm"
                     >
                         <ShoppingCart size={18} />
                         {cartCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px] 
-                     bg-accent text-white rounded-full 
+                            <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px]
+                     bg-accent text-white rounded-full
                      flex items-center justify-center font-bold">
                                 {cartCount}
                             </span>
                         )}
                     </Link>
+
+                    {/* Notification Bell */}
+                    {user && (
+                        <div className="relative">
+                            <button
+                                onClick={openNotifications}
+                                className="relative w-10 h-10 flex items-center justify-center rounded-full border border-gray-200 hover:border-primary transition-all shadow-sm focus:outline-none"
+                            >
+                                <Bell size={18} />
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px] bg-red-500 text-white rounded-full flex items-center justify-center font-bold">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            <AnimatePresence>
+                                {isNotifOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden"
+                                    >
+                                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                                            <span className="font-semibold text-sm text-gray-800">Notifications</span>
+                                            {unreadCount > 0 && (
+                                                <button onClick={markAllRead} className="text-xs text-primary hover:underline">
+                                                    Mark all read
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="max-h-80 overflow-y-auto">
+                                            {notifications.length === 0 ? (
+                                                <p className="text-sm text-gray-400 text-center py-8">No notifications yet</p>
+                                            ) : (
+                                                notifications.map((n) => (
+                                                    <div key={n.id} className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${!n.is_read ? 'bg-blue-50/50' : ''}`}>
+                                                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-text flex-shrink-0">
+                                                            {n.actor_name ? n.actor_name.charAt(0).toUpperCase() : '?'}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs text-gray-700 leading-relaxed">{n.message}</p>
+                                                            {n.type === "community_join_request" ? (
+                                                                <div className="flex gap-1.5 mt-2">
+                                                                    <button
+                                                                        onClick={() => handleJoinRequestApprove(n)}
+                                                                        className="px-2.5 py-1 bg-green-500 text-white text-[10px] rounded-lg font-bold hover:bg-green-600 transition-colors"
+                                                                    >
+                                                                        Approve
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleJoinRequestReject(n)}
+                                                                        className="px-2.5 py-1 bg-red-500 text-white text-[10px] rounded-lg font-bold hover:bg-red-600 transition-colors"
+                                                                    >
+                                                                        Reject
+                                                                    </button>
+                                                                    {n.actor_username && (
+                                                                        <Link
+                                                                            href={`/profile/${n.actor_username}`}
+                                                                            onClick={() => setIsNotifOpen(false)}
+                                                                            className="px-2.5 py-1 bg-yellow-400 text-white text-[10px] rounded-lg font-bold hover:bg-yellow-500 transition-colors"
+                                                                        >
+                                                                            Profile
+                                                                        </Link>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-[10px] text-gray-400 mt-1">
+                                                                    {new Date(n.created_at).toLocaleString()}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        {!n.is_read && (
+                                                            <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1" />
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    )}
+
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-transparent hover:border-primary transition-all focus:outline-none"
                     >
-                        {/* Dynamic User Initial */}
-                        <div className="w-full h-full bg-secondary flex items-center justify-center text-text font-bold">
-                            {userInitial}
-                        </div>
+                        {user?.avatar_url ? (
+                            <img
+                                src={user.avatar_url.startsWith("http") ? user.avatar_url : `http://localhost:8000${user.avatar_url}`}
+                                alt="avatar"
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-secondary flex items-center justify-center text-text font-bold">
+                                {userInitial}
+                            </div>
+                        )}
                     </button>
                     <p className="text-text font-bold">{user?.full_name}</p>
                 </div>

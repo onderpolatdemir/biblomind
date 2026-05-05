@@ -26,8 +26,11 @@ class UserPreferencesUpdate(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     """Schema for updating user profile information."""
-    full_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's full name")
-    
+    full_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    username: Optional[str] = Field(None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    bio: Optional[str] = Field(None, max_length=300)
+    reading_goal: Optional[int] = Field(None, ge=1, le=500)
+
     class Config:
         from_attributes = True
 
@@ -37,9 +40,30 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     full_name: Optional[str] = None
+    username: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    reading_goal: Optional[int] = None
     is_admin: bool = False
     created_at: datetime
-    
+
+    class Config:
+        from_attributes = True
+
+
+class PublicUserResponse(BaseModel):
+    """Public profile — shown to other users, no email."""
+    id: UUID
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    reading_goal: Optional[int] = None
+    created_at: datetime
+    buddy_count: int = 0
+    community_count: int = 0
+    post_count: int = 0
+
     class Config:
         from_attributes = True
 
@@ -47,7 +71,7 @@ class UserResponse(BaseModel):
 class UserWithPreferences(UserResponse):
     """User response with preferences included."""
     preferences: UserPreferences = Field(default_factory=UserPreferences)
-    
+
     class Config:
         from_attributes = True
 
