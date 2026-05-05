@@ -563,13 +563,16 @@ class CommunityService:
         }
 
     def delete_post(self, community_id: UUID, post_id: UUID, user_id: UUID):
-        post = self.db.query(CommunityPost).filter(CommunityPost.id == post_id).first()
+        post = self.db.query(CommunityPost).filter(
+            CommunityPost.id == post_id,
+            CommunityPost.community_id == community_id,
+        ).first()
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
         role = self._get_member_role(community_id, user_id)
         if post.author_id != user_id and _role_rank(role) < _role_rank("moderator"):
             raise HTTPException(status_code=403, detail="Not allowed to delete this post")
-        community = self._get_community_or_404(community_id)
+        community = self._get_community_or_404(post.community_id)
         community.post_count = max(0, (community.post_count or 1) - 1)
         self.db.delete(post)
         self.db.commit()
