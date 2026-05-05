@@ -47,11 +47,13 @@ export default function SocialRightPanel() {
 
     return (
         <aside className="w-72 flex-shrink-0 space-y-4">
-            {activities.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                    <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 mb-3">
-                        <Clock size={16} className="text-primary" /> Recent Activity
-                    </h3>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 mb-3">
+                    <Clock size={16} className="text-primary" /> Recent Activity
+                </h3>
+                {activities.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-4">No recent activity yet.</p>
+                ) : (
                     <div className="space-y-3">
                         {activities.map((a) => (
                             <div key={a.id} className="flex gap-2">
@@ -75,8 +77,8 @@ export default function SocialRightPanel() {
                             </div>
                         ))}
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             {suggested.length > 0 && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">

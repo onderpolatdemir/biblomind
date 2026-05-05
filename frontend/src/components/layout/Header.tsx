@@ -235,25 +235,19 @@ export default function Header() {
                         Book Buddies
                     </div>
                 </Link>
-                <Link href="/social" className="hover:text-primary transition-colors py-4">
-                    <div className="flex items-center gap-1">
-                        <Globe />
-                        Social
-                    </div>
-                </Link>
                 <div
                     className="relative h-full flex items-center"
                     onMouseEnter={() => setIsSocialOpen(true)}
                     onMouseLeave={() => setIsSocialOpen(false)}
                 >
-                    <Link href="/book-buddies" className="hover:text-primary transition-colors py-4">
+                    <Link href="/social" className="hover:text-primary transition-colors py-4">
                         <div className="flex items-center gap-1">
-                            <Users />
-                            Book Buddies
+                            <Globe />
+                            Social
                         </div>
                     </Link>
 
-                    {/* BiblioMind Social Dropdown */}
+                    {/* Social Dropdown */}
                     <AnimatePresence>
                         {isSocialOpen && (
                             <motion.div
@@ -261,20 +255,21 @@ export default function Header() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 10 }}
                                 transition={{ duration: 0.2 }}
-                                className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white shadow-xl border border-gray-100 rounded-2xl p-3 z-50"
+                                className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white shadow-xl border border-gray-100 rounded-2xl py-2 z-50 w-48"
                             >
                                 <Link
                                     href="/social"
-                                    className="block hover:opacity-80 transition-opacity"
+                                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
                                     onClick={() => setIsSocialOpen(false)}
                                 >
-                                    <Image
-                                        src="/biblomind_social.png"
-                                        alt="BiblioMind Social"
-                                        width={180}
-                                        height={60}
-                                        className="object-contain"
-                                    />
+                                    <Globe size={14} /> Social Feed
+                                </Link>
+                                <Link
+                                    href="/social/communities"
+                                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
+                                    onClick={() => setIsSocialOpen(false)}
+                                >
+                                    <Users size={14} /> Communities
                                 </Link>
                             </motion.div>
                         )}
