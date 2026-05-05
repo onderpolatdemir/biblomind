@@ -1,144 +1,134 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Community } from "@/types/social";
-import { Users, Lock, Globe, MessageSquare } from "lucide-react";
+import { Users, Lock, Globe } from "lucide-react";
+import api from "@/lib/api";
+
+const BACKEND_URL = "http://localhost:8000";
 
 interface CommunityCardProps {
-    community: Community;
-    index?: number;
+    community: {
+        id: string;
+        name: string;
+        description: string | null;
+        privacy: string;
+        member_count: number;
+        category_tags: string[];
+        profile_photo_url: string | null;
+        is_member: boolean;
+        join_request_status?: string | null;
+    };
     onJoin?: (id: string) => void;
 }
 
-export default function CommunityCard({ community, index = 0, onJoin }: CommunityCardProps) {
+export default function CommunityCard({ community, onJoin }: CommunityCardProps) {
+    const [isMember, setIsMember] = useState(community.is_member);
+    const [requestStatus, setRequestStatus] = useState<string | null>(community.join_request_status ?? null);
+    const [loading, setLoading] = useState(false);
+
+    const handleJoin = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isMember || requestStatus === "pending" || requestStatus === "rejected") return;
+
+        setLoading(true);
+        try {
+            const res = await api.post(`/communities/${community.id}/join`);
+            if (res.data?.status === "pending") {
+                setRequestStatus("pending");
+            } else {
+                setIsMember(true);
+                onJoin?.(community.id);
+            }
+        } catch {
+            // ignore
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const avatarSrc = community.profile_photo_url
+        ? community.profile_photo_url.startsWith("http")
+            ? community.profile_photo_url
+            : `${BACKEND_URL}${community.profile_photo_url}`
+        : null;
+
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.4 }}
-        >
-            <Link
-                href={`/social/communities/${community.id}`}
-                className="social-card block overflow-hidden group"
-            >
-                {/* Banner */}
-                <div className="relative h-28 overflow-hidden">
-                    <img
-                        src={community.banner_photo}
-                        alt={`${community.name} banner`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] via-transparent to-transparent" />
+        <Link href={`/social/communities/${community.id}`} className="block group">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden">
+                <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/40 flex items-center justify-center relative">
+                    {avatarSrc ? (
+                        <img src={avatarSrc} alt={community.name} className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="text-4xl font-bold text-primary/40">
+                            {community.name.charAt(0).toUpperCase()}
+                        </span>
+                    )}
 
-                    {/* Privacy Badge */}
-                    <div
-                        className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold"
-                        style={{
-                            backgroundColor: "rgba(0,0,0,0.6)",
-                            color: community.privacy === "private" ? "var(--social-accent)" : "var(--social-success)",
-                        }}
-                    >
-                        {community.privacy === "private" ? <Lock size={10} /> : <Globe size={10} />}
-                        {community.privacy === "private" ? "Private" : "Public"}
-                    </div>
-                </div>
-
-                {/* Profile Photo Overlay */}
-                <div className="relative px-4 -mt-6">
-                    <div
-                        className="w-12 h-12 rounded-xl overflow-hidden border-2 flex-shrink-0"
-                        style={{
-                            borderColor: "var(--social-card)",
-                            backgroundColor: "var(--social-card-elevated)",
-                        }}
-                    >
-                        {community.profile_photo?.startsWith("/") ||
-                            community.profile_photo?.startsWith("http") ? (
-                            <img
-                                src={community.profile_photo}
-                                alt={community.name}
-                                className="w-full h-full object-cover"
-                            />
+                    <div className="absolute top-2 right-2">
+                        {community.privacy === "private" ? (
+                            <Lock size={14} className="text-gray-500" />
                         ) : (
-                            <div
-                                className="w-full h-full flex items-center justify-center text-lg font-bold"
-                                style={{ color: "var(--social-accent)" }}
-                            >
-                                {community.name.charAt(0)}
-                            </div>
+                            <Globe size={14} className="text-gray-400" />
                         )}
                     </div>
                 </div>
 
-                {/* Info */}
-                <div className="p-4 pt-2">
-                    <h3
-                        className="font-bold text-sm mb-1 truncate"
-                        style={{ color: "var(--social-text)" }}
-                    >
+                <div className="p-4">
+                    <h3 className="font-bold text-gray-900 text-sm mb-1 truncate group-hover:text-primary transition-colors">
                         {community.name}
                     </h3>
-                    <p
-                        className="text-xs leading-relaxed mb-3 line-clamp-2"
-                        style={{ color: "var(--social-text-muted)" }}
-                    >
-                        {community.description}
-                    </p>
 
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-1 mb-3">
-                        {community.category_tags.slice(0, 3).map((tag) => (
-                            <span key={tag} className="social-tag text-[10px] py-0.5 px-2">
-                                {tag}
-                            </span>
-                        ))}
+                    {community.description && (
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-3">{community.description}</p>
+                    )}
+
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
+                        <Users size={12} />
+                        <span>{community.member_count} members</span>
                     </div>
 
-                    {/* Stats & Join */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <span
-                                className="flex items-center gap-1 text-xs"
-                                style={{ color: "var(--social-text-muted)" }}
-                            >
-                                <Users size={12} />
-                                {community.member_count.toLocaleString()}
-                            </span>
-                            <span
-                                className="flex items-center gap-1 text-xs"
-                                style={{ color: "var(--social-text-muted)" }}
-                            >
-                                <MessageSquare size={12} />
-                                {community.post_count}
-                            </span>
+                    {community.category_tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                            {community.category_tags.slice(0, 2).map((tag) => (
+                                <span
+                                    key={tag}
+                                    className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium"
+                                >
+                                    {tag}
+                                </span>
+                            ))}
                         </div>
+                    )}
 
-                        {community.is_member ? (
-                            <span
-                                className="text-xs font-bold px-3 py-1 rounded-lg"
-                                style={{
-                                    backgroundColor: "var(--social-accent-dim)",
-                                    color: "var(--social-accent)",
-                                }}
-                            >
-                                Joined
-                            </span>
-                        ) : (
-                            <button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    onJoin?.(community.id);
-                                }}
-                                className="social-btn-primary text-xs px-3 py-1"
-                            >
-                                Join
-                            </button>
-                        )}
-                    </div>
+                    <button
+                        onClick={handleJoin}
+                        disabled={loading || isMember || requestStatus === "pending" || requestStatus === "rejected"}
+                        className={`w-full py-2 rounded-xl text-xs font-bold transition-all disabled:cursor-not-allowed ${
+                            isMember
+                                ? "bg-green-100 text-green-700"
+                                : requestStatus === "pending"
+                                  ? "bg-gray-100 text-gray-400"
+                                  : requestStatus === "rejected"
+                                    ? "bg-red-50 text-red-400"
+                                    : "bg-primary text-white hover:bg-opacity-90"
+                        }`}
+                    >
+                        {loading
+                            ? "Sending..."
+                            : isMember
+                              ? "Joined"
+                              : requestStatus === "pending"
+                                ? "Request Pending"
+                                : requestStatus === "rejected"
+                                  ? "Request Denied"
+                                  : community.privacy === "private"
+                                    ? "Request to Join"
+                                    : "Join Community"}
+                    </button>
                 </div>
-            </Link>
-        </motion.div>
+            </div>
+        </Link>
     );
 }

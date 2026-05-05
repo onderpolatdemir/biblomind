@@ -1,151 +1,132 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import Link from "next/link";
-import { MOCK_COMMUNITIES } from "@/lib/social-mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Header from "@/components/layout/Header";
 import CommunityCard from "@/components/social/CommunityCard";
-import { Plus, Search, Filter } from "lucide-react";
-import { CATEGORIES } from "@/lib/constants";
+import { Search, Plus } from "lucide-react";
+import api from "@/lib/api";
+import { motion } from "framer-motion";
 
-export default function ExploreCommunities() {
-    const [searchQuery, setSearchQuery] = useState("");
-    const [selectedTag, setSelectedTag] = useState<string | null>(null);
-    const [communities, setCommunities] = useState(MOCK_COMMUNITIES);
+interface Community {
+    id: string;
+    name: string;
+    description: string | null;
+    privacy: string;
+    member_count: number;
+    category_tags: string[];
+    profile_photo_url: string | null;
+    is_member: boolean;
+}
 
-    const filteredCommunities = communities.filter((c) => {
-        const matchesSearch =
-            !searchQuery ||
-            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesTag =
-            !selectedTag || c.category_tags.includes(selectedTag);
-        return matchesSearch && matchesTag;
-    });
+export default function CommunitiesPage() {
+    const router = useRouter();
+    const [communities, setCommunities] = useState<Community[]>([]);
+    const [search, setSearch] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
 
-    // Get unique tags from all communities + some from CATEGORIES
-    const allTags = Array.from(
-        new Set(communities.flatMap((c) => c.category_tags))
-    );
+    const fetchCommunities = useCallback(async (q: string, pg: number, replace = false) => {
+        setIsLoading(true);
+        try {
+            const res = await api.get("/communities/", {
+                params: { search: q || undefined, page: pg, limit: 20 },
+            });
+            const items: Community[] = res.data.communities ?? [];
+            setCommunities((prev) => (replace ? items : [...prev, ...items]));
+            setHasMore(items.length === 20);
+        } catch {
+            setCommunities([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-    const handleJoin = (id: string) => {
-        setCommunities((prev) =>
-            prev.map((c) =>
-                c.id === id
-                    ? { ...c, is_member: true, member_count: c.member_count + 1 }
-                    : c
-            )
-        );
+    useEffect(() => {
+        fetchCommunities("", 1, true);
+    }, [fetchCommunities]);
+
+    const handleSearch = (q: string) => {
+        setSearch(q);
+        setPage(1);
+        fetchCommunities(q, 1, true);
     };
 
     return (
-        <div>
-            {/* Page Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-8"
-            >
-                <div className="flex items-center justify-between mb-6">
+        <div className="min-h-screen bg-gray-50/50 font-body">
+            <Header />
+            <main className="max-w-7xl mx-auto px-4 md:px-8 py-12">
+                <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1
-                            className="text-3xl font-heading font-bold mb-1"
-                            style={{ color: "var(--social-text)" }}
-                        >
-                            Explore Communities
-                        </h1>
-                        <p
-                            className="text-sm"
-                            style={{ color: "var(--social-text-muted)" }}
-                        >
-                            Find your tribe. Join communities about the books you love.
-                        </p>
+                        <h1 className="text-3xl font-heading font-bold text-gray-900 mb-1">Communities</h1>
+                        <p className="text-gray-500">Find your reading tribe</p>
                     </div>
-
-                    <Link
-                        href="/social/communities/create"
-                        className="social-btn-primary flex items-center gap-2"
+                    <button
+                        onClick={() => router.push("/social/communities/create")}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 transition-all shadow-sm"
                     >
-                        <Plus size={16} />
-                        Create Community
-                    </Link>
+                        <Plus size={16} /> Create
+                    </button>
                 </div>
 
-                {/* Search + Filters */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <div className="relative flex-1 max-w-md">
-                        <Search
-                            size={16}
-                            className="absolute left-3 top-1/2 -translate-y-1/2"
-                            style={{ color: "var(--social-text-muted)" }}
-                        />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search communities..."
-                            className="social-input pl-9 w-full text-sm"
-                        />
-                    </div>
+                <div className="relative mb-8 max-w-md">
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        placeholder="Search communities..."
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all text-sm"
+                    />
+                </div>
 
-                    <div className="flex flex-wrap gap-1.5">
-                        <button
-                            onClick={() => setSelectedTag(null)}
-                            className={`social-tag text-[11px] ${!selectedTag ? "social-tag-active" : ""}`}
-                        >
-                            All
-                        </button>
-                        {allTags.map((tag) => (
-                            <button
-                                key={tag}
-                                onClick={() =>
-                                    setSelectedTag(selectedTag === tag ? null : tag)
-                                }
-                                className={`social-tag text-[11px] ${selectedTag === tag ? "social-tag-active" : ""}`}
-                            >
-                                {tag}
-                            </button>
+                {isLoading && communities.length === 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                            <div key={i} className="h-56 bg-white rounded-2xl border border-gray-100 animate-pulse" />
                         ))}
                     </div>
-                </div>
-            </motion.div>
+                ) : communities.length === 0 ? (
+                    <div className="text-center py-24">
+                        <p className="text-gray-400 mb-3">No communities found.</p>
+                        <button
+                            onClick={() => router.push("/social/communities/create")}
+                            className="text-primary font-bold hover:underline"
+                        >
+                            Create the first one →
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+                        >
+                            {communities.map((c) => (
+                                <CommunityCard key={c.id} community={c} />
+                            ))}
+                        </motion.div>
 
-            {/* Community Grid */}
-            {filteredCommunities.length === 0 ? (
-                <div
-                    className="text-center py-16 social-card"
-                >
-                    <Filter
-                        size={40}
-                        className="mx-auto mb-3"
-                        style={{ color: "var(--social-text-muted)" }}
-                    />
-                    <p
-                        className="font-bold mb-1"
-                        style={{ color: "var(--social-text-secondary)" }}
-                    >
-                        No communities found
-                    </p>
-                    <p
-                        className="text-sm"
-                        style={{ color: "var(--social-text-muted)" }}
-                    >
-                        Try a different search or create your own!
-                    </p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {filteredCommunities.map((community, i) => (
-                        <CommunityCard
-                            key={community.id}
-                            community={community}
-                            index={i}
-                            onJoin={handleJoin}
-                        />
-                    ))}
-                </div>
-            )}
+                        {hasMore && (
+                            <div className="flex justify-center mt-8">
+                                <button
+                                    onClick={() => {
+                                        const next = page + 1;
+                                        setPage(next);
+                                        fetchCommunities(search, next);
+                                    }}
+                                    disabled={isLoading}
+                                    className="px-8 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:border-primary transition-all"
+                                >
+                                    {isLoading ? "Loading..." : "Load more"}
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
+            </main>
         </div>
     );
 }

@@ -1,420 +1,395 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { MOCK_COMMUNITIES, MOCK_POSTS } from "@/lib/social-mock-data";
+import Header from "@/components/layout/Header";
 import PostCard from "@/components/social/PostCard";
 import PostComposer from "@/components/social/PostComposer";
-import {
-    Users, MessageSquare, BookOpen, Shield, Globe, Lock,
-    ArrowLeft, UserPlus, LogOut, Crown, Star, ChevronRight,
-    ExternalLink, MapPin, Calendar
-} from "lucide-react";
-import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { Users, Lock, Globe, Settings } from "lucide-react";
+import api from "@/lib/api";
+import { motion } from "framer-motion";
 
-type Tab = "posts" | "members" | "about" | "rules";
+const BACKEND_URL = "http://localhost:8000";
 
-function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+interface Post {
+    id: string;
+    content: string;
+    image_url: string | null;
+    author_name: string;
+    author_avatar: string | null;
+    author_username: string | null;
+    community_name: string;
+    community_id: string;
+    is_liked: boolean;
+    is_saved: boolean;
+    like_count: number;
+    comment_count: number;
+    save_count: number;
+    is_mine: boolean;
+    created_at: string;
 }
 
+interface Member {
+    user_id: string;
+    full_name: string;
+    username: string | null;
+    avatar_url: string | null;
+    role: string;
+    joined_at: string;
+}
+
+interface Community {
+    id: string;
+    name: string;
+    description: string | null;
+    privacy: string;
+    member_count: number;
+    post_count: number;
+    category_tags: string[];
+    profile_photo_url: string | null;
+    banner_photo_url: string | null;
+    is_member: boolean;
+    is_creator: boolean;
+    user_role: string | null;
+    rules: string[];
+    join_request_status?: "pending" | "approved" | "rejected" | null;
+}
+
+type Tab = "posts" | "members" | "about";
+
 export default function CommunityDetailPage() {
-    const params = useParams();
+    const { id } = useParams<{ id: string }>();
+    const { user } = useAuth();
     const router = useRouter();
-    const communityId = params.id as string;
+    const [community, setCommunity] = useState<Community | null>(null);
+    const [posts, setPosts] = useState<Post[]>([]);
+    const [members, setMembers] = useState<Member[]>([]);
+    const [tab, setTab] = useState<Tab>("posts");
+    const [isLoading, setIsLoading] = useState(true);
+    const [postsLoading, setPostsLoading] = useState(false);
+    const [membersLoaded, setMembersLoaded] = useState(false);
 
-    const community = MOCK_COMMUNITIES.find((c) => c.id === communityId);
-    const communityPosts = MOCK_POSTS.filter((p) => p.community_id === communityId);
+    const fetchCommunity = useCallback(async () => {
+        try {
+            const res = await api.get(`/communities/${id}`);
+            setCommunity(res.data);
+        } catch {
+            router.push("/social/communities");
+        }
+    }, [id, router]);
 
-    const [activeTab, setActiveTab] = useState<Tab>("posts");
-    const [isMember, setIsMember] = useState(community?.is_member ?? false);
+    const fetchPosts = useCallback(async () => {
+        setPostsLoading(true);
+        try {
+            const res = await api.get(`/communities/${id}/posts`);
+            setPosts(res.data.posts ?? []);
+        } catch {
+            setPosts([]);
+        } finally {
+            setPostsLoading(false);
+        }
+    }, [id]);
 
-    if (!community) {
+    useEffect(() => {
+        Promise.all([fetchCommunity(), fetchPosts()]).finally(() => setIsLoading(false));
+    }, [fetchCommunity, fetchPosts]);
+
+    const fetchMembers = async () => {
+        if (membersLoaded) return;
+        try {
+            const res = await api.get(`/communities/${id}/members`);
+            setMembers(res.data.members ?? []);
+            setMembersLoaded(true);
+        } catch {}
+    };
+
+    const handleTabChange = (t: Tab) => {
+        setTab(t);
+        if (t === "members") fetchMembers();
+    };
+
+    const toggleMembership = async () => {
+        if (!community) return;
+        try {
+            if (community.is_member) {
+                await api.post(`/communities/${id}/leave`);
+                setCommunity((c) =>
+                    c ? { ...c, is_member: false, user_role: null, member_count: c.member_count - 1 } : c
+                );
+            } else {
+                const res = await api.post(`/communities/${id}/join`);
+                if (res.data?.status === "pending") {
+                    setCommunity((c) => (c ? { ...c, join_request_status: "pending" } : c));
+                } else {
+                    setCommunity((c) =>
+                        c ? { ...c, is_member: true, user_role: "member", member_count: c.member_count + 1 } : c
+                    );
+                }
+            }
+        } catch {}
+    };
+
+    const deletePost = async (postId: string) => {
+        try {
+            await api.delete(`/communities/${id}/posts/${postId}`);
+            setPosts((prev) => prev.filter((p) => p.id !== postId));
+        } catch {}
+    };
+
+    if (isLoading) {
         return (
-            <div className="text-center py-20">
-                <p className="text-lg font-bold" style={{ color: "var(--social-text-muted)" }}>
-                    Community not found
-                </p>
-                <Link
-                    href="/social/communities"
-                    className="social-btn-primary mt-4 inline-block"
-                >
-                    Browse Communities
-                </Link>
+            <div className="min-h-screen bg-gray-50 font-body">
+                <Header />
+                <div className="flex justify-center py-32">
+                    <div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+                </div>
             </div>
         );
     }
 
-    const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
-        { key: "posts", label: "Posts", icon: <MessageSquare size={16} />, count: communityPosts.length },
-        { key: "members", label: "Members", icon: <Users size={16} />, count: community.member_count },
-        { key: "about", label: "About", icon: <BookOpen size={16} /> },
-        { key: "rules", label: "Rules", icon: <Shield size={16} />, count: community.rules.length },
-    ];
+    if (!community) return null;
 
-    const roleIcon = (role: string) => {
-        if (role === "creator") return <Crown size={12} style={{ color: "var(--social-accent)" }} />;
-        if (role === "admin") return <Star size={12} style={{ color: "#ef4444" }} />;
-        if (role === "moderator") return <Shield size={12} style={{ color: "#3b82f6" }} />;
-        return null;
-    };
+    const bannerSrc = community.banner_photo_url
+        ? community.banner_photo_url.startsWith("http")
+            ? community.banner_photo_url
+            : `${BACKEND_URL}${community.banner_photo_url}`
+        : null;
+
+    const profileSrc = community.profile_photo_url
+        ? community.profile_photo_url.startsWith("http")
+            ? community.profile_photo_url
+            : `${BACKEND_URL}${community.profile_photo_url}`
+        : null;
+
+    const canPost = community.is_member;
 
     return (
-        <div>
-            {/* Back Button */}
-            <button
-                onClick={() => router.back()}
-                className="flex items-center gap-1.5 text-sm font-medium mb-4 transition-colors"
-                style={{ color: "var(--social-text-muted)" }}
-            >
-                <ArrowLeft size={16} />
-                Back
-            </button>
-
-            {/* Banner */}
-            <div className="relative rounded-2xl overflow-hidden mb-6">
-                <div className="h-48 md:h-64">
-                    <img
-                        src={community.banner_photo}
-                        alt={`${community.name} banner`}
-                        className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-transparent to-transparent" />
-                </div>
-
-                {/* Profile Photo + Info Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 flex items-end gap-4">
+        <div className="min-h-screen bg-gray-50/50 font-body">
+            <Header />
+            <main className="max-w-4xl mx-auto px-4 py-8">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
                     <div
-                        className="w-20 h-20 rounded-2xl overflow-hidden border-4 flex-shrink-0"
-                        style={{
-                            borderColor: "var(--social-bg)",
-                            backgroundColor: "var(--social-card-elevated)",
-                        }}
-                    >
-                        {community.profile_photo?.startsWith("/") ||
-                            community.profile_photo?.startsWith("http") ? (
-                            <img
-                                src={community.profile_photo}
-                                alt={community.name}
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div
-                                className="w-full h-full flex items-center justify-center text-2xl font-bold"
-                                style={{ color: "var(--social-accent)" }}
-                            >
-                                {community.name.charAt(0)}
+                        className="h-36 bg-gradient-to-r from-primary/20 to-secondary/40"
+                        style={
+                            bannerSrc
+                                ? { backgroundImage: `url(${bannerSrc})`, backgroundSize: "cover", backgroundPosition: "center" }
+                                : {}
+                        }
+                    />
+                    <div className="px-6 pb-6">
+                        <div className="flex items-end gap-4 -mt-10 mb-4">
+                            <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-md overflow-hidden bg-primary/10 flex items-center justify-center font-bold text-primary text-3xl flex-shrink-0">
+                                {profileSrc ? (
+                                    <img src={profileSrc} alt={community.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    community.name.charAt(0).toUpperCase()
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0 pb-1">
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-2xl font-bold text-gray-900 truncate">{community.name}</h1>
+                                    {community.privacy === "private" ? (
+                                        <Lock size={16} className="text-gray-400" />
+                                    ) : (
+                                        <Globe size={16} className="text-gray-400" />
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-gray-500">
+                                    <span className="flex items-center gap-1">
+                                        <Users size={14} />
+                                        {community.member_count} members
+                                    </span>
+                                    <span>{community.post_count} posts</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 pb-1">
+                                {community.is_creator && (
+                                    <button className="p-2 rounded-xl border border-gray-200 text-gray-500 hover:border-primary hover:text-primary transition-all">
+                                        <Settings size={16} />
+                                    </button>
+                                )}
+                                {!community.is_creator && (
+                                    <button
+                                        onClick={toggleMembership}
+                                        disabled={
+                                            community.join_request_status === "pending" ||
+                                            community.join_request_status === "rejected"
+                                        }
+                                        className={`px-5 py-2 rounded-xl font-bold text-sm transition-all disabled:cursor-not-allowed ${
+                                            community.is_member
+                                                ? "border-2 border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500"
+                                                : community.join_request_status === "pending"
+                                                  ? "bg-gray-100 text-gray-400 border-2 border-gray-200"
+                                                  : community.join_request_status === "rejected"
+                                                    ? "bg-red-50 text-red-400 border-2 border-red-200"
+                                                    : "bg-primary text-white hover:bg-opacity-90"
+                                        }`}
+                                    >
+                                        {community.is_member
+                                            ? "Leave"
+                                            : community.join_request_status === "pending"
+                                              ? "Request Pending"
+                                              : community.join_request_status === "rejected"
+                                                ? "Request Denied"
+                                                : community.privacy === "private"
+                                                  ? "Request to Join"
+                                                  : "Join"}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {community.description && <p className="text-gray-600 text-sm mb-4">{community.description}</p>}
+
+                        {community.category_tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {community.category_tags.map((tag) => (
+                                    <span
+                                        key={tag}
+                                        className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
                             </div>
                         )}
-                    </div>
 
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <h1
-                                className="text-2xl font-heading font-bold truncate"
-                                style={{ color: "var(--social-text)" }}
-                            >
-                                {community.name}
-                            </h1>
-                            <span
-                                className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md"
-                                style={{
-                                    backgroundColor: "rgba(0,0,0,0.5)",
-                                    color: community.privacy === "private"
-                                        ? "var(--social-accent)"
-                                        : "var(--social-success)",
-                                }}
-                            >
-                                {community.privacy === "private" ? <Lock size={10} /> : <Globe size={10} />}
-                                {community.privacy}
-                            </span>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            <span className="flex items-center gap-1 text-xs" style={{ color: "var(--social-text-muted)" }}>
-                                <Users size={12} /> {community.member_count.toLocaleString()} members
-                            </span>
-                            <span className="flex items-center gap-1 text-xs" style={{ color: "var(--social-text-muted)" }}>
-                                <MessageSquare size={12} /> {community.post_count} posts
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Join / Leave */}
-                    <div className="flex-shrink-0">
-                        {isMember ? (
-                            <button
-                                onClick={() => setIsMember(false)}
-                                className="social-btn-outline flex items-center gap-1.5 text-sm"
-                            >
-                                <LogOut size={14} />
-                                Leave
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => setIsMember(true)}
-                                className="social-btn-primary flex items-center gap-1.5 text-sm"
-                            >
-                                <UserPlus size={14} />
-                                Join Community
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-1.5 mb-6">
-                {community.category_tags.map((tag) => (
-                    <span key={tag} className="social-tag text-xs">
-                        {tag}
-                    </span>
-                ))}
-            </div>
-
-            {/* Tabs */}
-            <div
-                className="flex items-center gap-1 mb-6 overflow-x-auto pb-2"
-                style={{ borderBottom: "1px solid var(--social-border)" }}
-            >
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-all whitespace-nowrap relative"
-                        style={{
-                            color: activeTab === tab.key
-                                ? "var(--social-accent)"
-                                : "var(--social-text-muted)",
-                            backgroundColor: activeTab === tab.key
-                                ? "var(--social-accent-dim)"
-                                : "transparent",
-                        }}
-                    >
-                        {tab.icon}
-                        {tab.label}
-                        {tab.count !== undefined && (
-                            <span
-                                className="text-[10px] font-bold ml-1 px-1.5 py-0.5 rounded-full"
-                                style={{
-                                    backgroundColor: activeTab === tab.key
-                                        ? "var(--social-accent)"
-                                        : "var(--social-border)",
-                                    color: activeTab === tab.key
-                                        ? "#000"
-                                        : "var(--social-text-muted)",
-                                }}
-                            >
-                                {tab.count}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </div>
-
-            {/* Tab Content */}
-            <AnimatePresence mode="wait">
-                <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                >
-                    {/* ── Posts Tab ── */}
-                    {activeTab === "posts" && (
-                        <div className="flex flex-col gap-4">
-                            {isMember && (
-                                <PostComposer placeholder={`Share something with ${community.name}...`} />
-                            )}
-                            {communityPosts.length > 0 ? (
-                                communityPosts.map((post) => (
-                                    <PostCard key={post.id} post={post} showCommunity={false} />
-                                ))
-                            ) : (
-                                <div className="social-card p-8 text-center">
-                                    <MessageSquare size={32} className="mx-auto mb-2" style={{ color: "var(--social-text-muted)" }} />
-                                    <p className="text-sm" style={{ color: "var(--social-text-muted)" }}>
-                                        No posts yet. Be the first to share!
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── Members Tab ── */}
-                    {activeTab === "members" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {community.members.map((member) => (
-                                <div
-                                    key={member.user_id}
-                                    className="social-card p-4 flex items-center gap-3"
+                        <div className="flex border-t border-gray-100 mt-6">
+                            {(["posts", "members", "about"] as Tab[]).map((t) => (
+                                <button
+                                    key={t}
+                                    onClick={() => handleTabChange(t)}
+                                    className={`flex-1 py-3 text-sm font-bold capitalize transition-colors ${
+                                        tab === t
+                                            ? "text-primary border-b-2 border-primary"
+                                            : "text-gray-500 hover:text-gray-700"
+                                    }`}
                                 >
-                                    <div
-                                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                                        style={{
-                                            backgroundColor: "var(--social-card-elevated)",
-                                            color: "var(--social-text)",
-                                        }}
-                                    >
-                                        {member.full_name.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5">
-                                            <p
-                                                className="font-bold text-sm truncate"
-                                                style={{ color: "var(--social-text)" }}
-                                            >
-                                                {member.full_name}
-                                            </p>
-                                            {roleIcon(member.role)}
-                                        </div>
-                                        <p className="text-xs capitalize" style={{ color: "var(--social-text-muted)" }}>
-                                            {member.role} • Joined {formatDate(member.joined_at)}
-                                        </p>
-                                    </div>
-                                </div>
+                                    {t}
+                                </button>
                             ))}
                         </div>
-                    )}
+                    </div>
+                </div>
 
-                    {/* ── About Tab ── */}
-                    {activeTab === "about" && (
-                        <div className="social-card p-6 space-y-6">
-                            <div>
-                                <h3 className="font-bold text-sm mb-2 uppercase tracking-wide" style={{ color: "var(--social-text-muted)" }}>
-                                    Description
-                                </h3>
-                                <p className="text-sm leading-relaxed" style={{ color: "var(--social-text-secondary)" }}>
-                                    {community.description}
+                {tab === "posts" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                        {community.privacy === "private" && !community.is_member ? (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-14 text-center">
+                                <Lock size={44} className="text-gray-200 mx-auto mb-4" />
+                                <h3 className="font-bold text-gray-600 mb-2">This community is private</h3>
+                                <p className="text-gray-400 text-sm max-w-xs mx-auto">
+                                    {community.join_request_status === "pending"
+                                        ? "Your request is being reviewed by the community creator."
+                                        : community.join_request_status === "rejected"
+                                          ? "Your join request was not approved."
+                                          : "Request to join to view and participate in discussions."}
                                 </p>
                             </div>
-
-                            {/* Related Books */}
-                            {community.related_books.length > 0 && (
-                                <div>
-                                    <h3 className="font-bold text-sm mb-3 uppercase tracking-wide" style={{ color: "var(--social-text-muted)" }}>
-                                        Related Books
-                                    </h3>
-                                    <div className="flex flex-col gap-2">
-                                        {community.related_books.map((book, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex items-center gap-3 p-3 rounded-xl"
-                                                style={{ backgroundColor: "var(--social-bg-secondary)" }}
-                                            >
-                                                <BookOpen size={16} style={{ color: "var(--social-accent)" }} />
-                                                <div>
-                                                    <p className="text-sm font-semibold" style={{ color: "var(--social-text)" }}>
-                                                        {book.title}
-                                                    </p>
-                                                    <p className="text-xs" style={{ color: "var(--social-text-muted)" }}>
-                                                        {book.author}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Metadata */}
-                            <div className="flex flex-wrap gap-6">
-                                <div className="flex items-center gap-2 text-sm" style={{ color: "var(--social-text-muted)" }}>
-                                    <Calendar size={14} />
-                                    Created {formatDate(community.created_at)}
-                                </div>
-                                {community.location && (
-                                    <div className="flex items-center gap-2 text-sm" style={{ color: "var(--social-text-muted)" }}>
-                                        <MapPin size={14} />
-                                        {community.location}
-                                    </div>
+                        ) : (
+                            <>
+                                {canPost && (
+                                    <PostComposer
+                                        communityId={id}
+                                        onPost={fetchPosts}
+                                        authorInitial={user?.full_name?.charAt(0).toUpperCase() || "U"}
+                                    />
                                 )}
-                                {community.website && (
-                                    <a
-                                        href={community.website}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-sm hover:underline"
-                                        style={{ color: "var(--social-accent)" }}
-                                    >
-                                        <ExternalLink size={14} />
-                                        Website
-                                    </a>
-                                )}
-                            </div>
 
-                            {/* Creator */}
-                            <div>
-                                <h3 className="font-bold text-sm mb-2 uppercase tracking-wide" style={{ color: "var(--social-text-muted)" }}>
-                                    Created by
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                    <div
-                                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-                                        style={{
-                                            backgroundColor: "var(--social-card-elevated)",
-                                            color: "var(--social-accent)",
-                                        }}
-                                    >
-                                        {community.creator_name.charAt(0)}
+                                {postsLoading ? (
+                                    <div className="flex justify-center py-12">
+                                        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
                                     </div>
-                                    <span className="text-sm font-semibold" style={{ color: "var(--social-text)" }}>
-                                        {community.creator_name}
-                                    </span>
-                                    <Crown size={12} style={{ color: "var(--social-accent)" }} />
-                                </div>
-                            </div>
+                                ) : posts.length === 0 ? (
+                                    <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+                                        <p className="text-gray-400">No posts yet.</p>
+                                        {canPost && (
+                                            <p className="text-sm text-gray-400 mt-1">
+                                                Be the first to share something!
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    posts.map((post) => <PostCard key={post.id} post={post} onDelete={deletePost} />)
+                                )}
+                            </>
+                        )}
+                    </motion.div>
+                )}
+
+                {tab === "members" && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                    >
+                        <div className="px-5 py-4 border-b border-gray-50 text-sm font-bold text-gray-600">
+                            {community.member_count} Members
                         </div>
-                    )}
+                        <div className="divide-y divide-gray-50">
+                            {members.map((m) => {
+                                const avatarSrc = m.avatar_url
+                                    ? m.avatar_url.startsWith("http")
+                                        ? m.avatar_url
+                                        : `${BACKEND_URL}${m.avatar_url}`
+                                    : null;
 
-                    {/* ── Rules Tab ── */}
-                    {activeTab === "rules" && (
-                        <div className="social-card p-6">
-                            <h3
-                                className="font-bold text-base mb-4 flex items-center gap-2"
-                                style={{ color: "var(--social-text)" }}
-                            >
-                                <Shield size={18} style={{ color: "var(--social-accent)" }} />
-                                Community Rules
-                            </h3>
-                            {community.rules.length > 0 ? (
+                                return (
+                                    <div key={m.user_id} className="flex items-center gap-3 px-5 py-3">
+                                        <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex items-center justify-center font-bold text-text flex-shrink-0">
+                                            {avatarSrc ? (
+                                                <img src={avatarSrc} alt={m.full_name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                m.full_name?.charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm text-gray-800 truncate">{m.full_name}</p>
+                                            {m.username && <p className="text-xs text-primary">@{m.username}</p>}
+                                        </div>
+                                        <span
+                                            className={`text-xs px-2 py-0.5 rounded-full font-bold capitalize ${
+                                                m.role === "creator"
+                                                    ? "bg-primary/10 text-primary"
+                                                    : m.role === "admin"
+                                                      ? "bg-orange-100 text-orange-600"
+                                                      : "bg-gray-100 text-gray-500"
+                                            }`}
+                                        >
+                                            {m.role === "moderator" ? "member" : m.role}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                )}
+
+                {tab === "about" && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                        {community.rules.length > 0 && (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                                <h3 className="font-bold text-gray-800 mb-4">Community Rules</h3>
                                 <ol className="space-y-3">
                                     {community.rules.map((rule, i) => (
-                                        <li
-                                            key={i}
-                                            className="flex items-start gap-3 p-3 rounded-xl"
-                                            style={{ backgroundColor: "var(--social-bg-secondary)" }}
-                                        >
-                                            <span
-                                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                                                style={{
-                                                    backgroundColor: "var(--social-accent-dim)",
-                                                    color: "var(--social-accent)",
-                                                }}
-                                            >
-                                                {i + 1}
-                                            </span>
-                                            <p className="text-sm" style={{ color: "var(--social-text-secondary)" }}>
-                                                {rule}
-                                            </p>
+                                        <li key={i} className="flex gap-3 text-sm">
+                                            <span className="font-bold text-primary flex-shrink-0">{i + 1}.</span>
+                                            <span className="text-gray-600">{rule}</span>
                                         </li>
                                     ))}
                                 </ol>
-                            ) : (
-                                <p className="text-sm" style={{ color: "var(--social-text-muted)" }}>
-                                    No rules have been set for this community yet.
-                                </p>
-                            )}
-                        </div>
-                    )}
-                </motion.div>
-            </AnimatePresence>
+                            </div>
+                        )}
+                        {community.description && (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                                <h3 className="font-bold text-gray-800 mb-2">About</h3>
+                                <p className="text-gray-600 text-sm leading-relaxed">{community.description}</p>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </main>
         </div>
     );
 }

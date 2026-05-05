@@ -1,185 +1,100 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
-import { MOCK_COMMUNITIES, MOCK_USER_INTERESTS } from "@/lib/social-mock-data";
-import { Users, BookOpen, Star } from "lucide-react";
+import { Users, Plus } from "lucide-react";
+import api from "@/lib/api";
+
+const BACKEND_URL = "http://localhost:8000";
+
+interface MyCommunity {
+    id: string;
+    name: string;
+    profile_photo_url: string | null;
+    member_count: number;
+}
 
 export default function SocialSidebar() {
-    const { user } = useAuth();
-    const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : "U";
+    const [communities, setCommunities] = useState<MyCommunity[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Communities the user is a member of
-    const myCommunities = MOCK_COMMUNITIES.filter((c) => c.is_member);
+    useEffect(() => {
+        api.get("/communities/my")
+            .then((r) => setCommunities(r.data.communities ?? []))
+            .catch(() => setCommunities([]))
+            .finally(() => setIsLoading(false));
+    }, []);
 
     return (
-        <div className="flex flex-col gap-4">
-            {/* ── User Profile Card ── */}
-            <div className="social-card p-5">
-                {/* Avatar & Stats */}
-                <div className="flex flex-col items-center mb-4">
-                    <div className="avatar-ring mb-3">
-                        <div
-                            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold"
-                            style={{
-                                backgroundColor: "var(--social-card-elevated)",
-                                color: "var(--social-text)",
-                            }}
-                        >
-                            {userInitial}
-                        </div>
-                    </div>
-
-                    {/* Follower/Following Row */}
-                    <div className="flex items-center gap-6 mb-3">
-                        <div className="text-center">
-                            <p
-                                className="text-lg font-bold"
-                                style={{ color: "var(--social-text)" }}
-                            >
-                                128
-                            </p>
-                            <p
-                                className="text-xs"
-                                style={{ color: "var(--social-text-muted)" }}
-                            >
-                                Followers
-                            </p>
-                        </div>
-                        <div className="text-center">
-                            <p
-                                className="text-lg font-bold"
-                                style={{ color: "var(--social-text)" }}
-                            >
-                                64
-                            </p>
-                            <p
-                                className="text-xs"
-                                style={{ color: "var(--social-text-muted)" }}
-                            >
-                                Following
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Name & Username */}
-                    <h3
-                        className="font-bold text-base"
-                        style={{ color: "var(--social-text)" }}
-                    >
-                        {user?.full_name || "User"}
+        <aside className="w-64 flex-shrink-0">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sticky top-24">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                        <Users size={16} className="text-primary" /> My Communities
                     </h3>
-                    <p
-                        className="text-xs mb-3"
-                        style={{ color: "var(--social-text-muted)" }}
-                    >
-                        @{user?.full_name?.toLowerCase().replace(/\s+/g, "") || "user"}
-                    </p>
-
-                    {/* Bio */}
-                    <p
-                        className="text-xs text-center leading-relaxed mb-3"
-                        style={{ color: "var(--social-text-secondary)" }}
-                    >
-                        <Star
-                            size={12}
-                            className="inline mr-1"
-                            style={{ color: "var(--social-accent)" }}
-                        />
-                        Avid reader & book lover. Always looking for the next great story!
-                    </p>
-
-                    {/* My Profile Button */}
-                    <button className="social-btn-outline w-full text-sm py-2">
-                        My Profile
-                    </button>
-                </div>
-            </div>
-
-            {/* ── Reading Interests ── */}
-            <div className="social-card p-4">
-                <h4
-                    className="font-bold text-sm mb-3 flex items-center gap-2"
-                    style={{ color: "var(--social-text)" }}
-                >
-                    <BookOpen size={14} style={{ color: "var(--social-accent)" }} />
-                    Reading Interests
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                    {MOCK_USER_INTERESTS.map((interest) => (
-                        <span key={interest} className="social-tag text-[11px]">
-                            {interest}
-                        </span>
-                    ))}
-                </div>
-            </div>
-
-            {/* ── My Communities ── */}
-            <div className="social-card p-4">
-                <div className="flex items-center justify-between mb-3">
-                    <h4
-                        className="font-bold text-sm flex items-center gap-2"
-                        style={{ color: "var(--social-text)" }}
-                    >
-                        <Users size={14} style={{ color: "var(--social-accent)" }} />
-                        Communities
-                    </h4>
                     <Link
-                        href="/social/communities"
-                        className="text-xs font-semibold"
-                        style={{ color: "var(--social-accent)" }}
+                        href="/social/communities/create"
+                        className="w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center hover:bg-primary hover:text-white transition-all"
+                        title="Create community"
                     >
-                        See all
+                        <Plus size={14} />
                     </Link>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                    {myCommunities.map((community) => (
-                        <Link
-                            key={community.id}
-                            href={`/social/communities/${community.id}`}
-                            className="flex items-center gap-3 p-2 rounded-xl transition-all"
-                            style={{ color: "var(--social-text-secondary)" }}
-                        >
-                            <div
-                                className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0"
-                                style={{
-                                    backgroundColor: "var(--social-card-elevated)",
-                                }}
-                            >
-                                {community.profile_photo?.startsWith("/") ? (
-                                    <img
-                                        src={community.profile_photo}
-                                        alt={community.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div
-                                        className="w-full h-full flex items-center justify-center text-xs font-bold"
-                                        style={{ color: "var(--social-accent)" }}
-                                    >
-                                        {community.name.charAt(0)}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="min-w-0">
-                                <p
-                                    className="text-xs font-semibold truncate"
-                                    style={{ color: "var(--social-text)" }}
-                                >
-                                    {community.name}
-                                </p>
-                                <p
-                                    className="text-[10px]"
-                                    style={{ color: "var(--social-text-muted)" }}
-                                >
-                                    • {community.member_count.toLocaleString()} members
-                                </p>
-                            </div>
+                {isLoading ? (
+                    <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+                        ))}
+                    </div>
+                ) : communities.length === 0 ? (
+                    <div className="text-center py-6">
+                        <p className="text-xs text-gray-400 mb-3">You haven't joined any communities yet.</p>
+                        <Link href="/social/communities" className="text-xs font-bold text-primary hover:underline">
+                            Explore Communities →
                         </Link>
-                    ))}
-                </div>
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        {communities.map((c) => {
+                            const avatarSrc = c.profile_photo_url
+                                ? c.profile_photo_url.startsWith("http")
+                                    ? c.profile_photo_url
+                                    : `${BACKEND_URL}${c.profile_photo_url}`
+                                : null;
+
+                            return (
+                                <Link
+                                    key={c.id}
+                                    href={`/social/communities/${c.id}`}
+                                    className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors group"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                                        {avatarSrc ? (
+                                            <img src={avatarSrc} alt={c.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            c.name.charAt(0).toUpperCase()
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-700 truncate group-hover:text-primary transition-colors">
+                                            {c.name}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">{c.member_count} members</p>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+
+                        <Link
+                            href="/social/communities"
+                            className="block text-center text-xs font-bold text-primary hover:underline pt-2"
+                        >
+                            Explore more →
+                        </Link>
+                    </div>
+                )}
             </div>
-        </div>
+        </aside>
     );
 }

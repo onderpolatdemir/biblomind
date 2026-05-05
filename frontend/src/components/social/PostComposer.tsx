@@ -1,120 +1,111 @@
 "use client";
 
-import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { ImagePlus, Send } from "lucide-react";
+import { useState, useRef } from "react";
+import { ImagePlus, Send, X } from "lucide-react";
+import api from "@/lib/api";
 
 interface PostComposerProps {
-    onPost?: (content: string, imageFile?: File) => void;
-    placeholder?: string;
+    communityId: string;
+    onPost: () => void;
+    authorInitial?: string;
 }
 
-export default function PostComposer({
-    onPost,
-    placeholder = "Tell your friends about your thoughts...",
-}: PostComposerProps) {
-    const { user } = useAuth();
+export default function PostComposer({ communityId, onPost, authorInitial = "U" }: PostComposerProps) {
     const [content, setContent] = useState("");
+    const [image, setImage] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
 
-    const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : "U";
-
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        setImageFile(file);
+        setImage(file);
         setImagePreview(URL.createObjectURL(file));
     };
 
-    const handlePost = () => {
-        if (!content.trim() && !imageFile) return;
-        onPost?.(content.trim(), imageFile || undefined);
-        setContent("");
+    const clearImage = () => {
+        setImage(null);
         setImagePreview(null);
-        setImageFile(null);
+        if (fileRef.current) fileRef.current.value = "";
+    };
+
+    const handleSubmit = async () => {
+        if (!content.trim() || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            const form = new FormData();
+            form.append("content", content.trim());
+            if (image) form.append("image", image);
+            await api.post(`/communities/${communityId}/posts`, form, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            setContent("");
+            clearImage();
+            onPost();
+        } catch {
+            alert("Failed to post. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
-        <div className="social-card p-4">
-            <div className="flex items-start gap-3">
-                {/* User Avatar */}
-                <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                    style={{
-                        backgroundColor: "var(--social-card-elevated)",
-                        color: "var(--social-text)",
-                    }}
-                >
-                    {userInitial}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex gap-3">
+                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-text flex-shrink-0">
+                    {authorInitial}
                 </div>
 
-                {/* Input Area */}
                 <div className="flex-1">
                     <textarea
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
-                        placeholder={placeholder}
-                        rows={2}
-                        className="social-textarea w-full text-sm resize-none border-none bg-transparent p-0 focus:ring-0 focus:shadow-none"
-                        style={{
-                            color: "var(--social-text-secondary)",
-                            minHeight: "48px",
-                            boxShadow: "none",
-                        }}
+                        placeholder="Share something with this community..."
+                        maxLength={500}
+                        rows={3}
+                        className="w-full text-sm text-gray-700 resize-none outline-none border border-gray-200 rounded-xl p-3 focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                     />
 
-                    {/* Image Preview */}
                     {imagePreview && (
-                        <div className="relative mt-2 rounded-xl overflow-hidden max-h-[200px] inline-block">
-                            <img
-                                src={imagePreview}
-                                alt="Preview"
-                                className="max-h-[200px] rounded-xl object-cover"
-                            />
+                        <div className="relative mt-2 w-40 h-24 rounded-xl overflow-hidden">
+                            <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
                             <button
-                                onClick={() => {
-                                    setImagePreview(null);
-                                    setImageFile(null);
-                                }}
-                                className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                                style={{
-                                    backgroundColor: "rgba(0,0,0,0.7)",
-                                    color: "var(--social-text)",
-                                }}
+                                onClick={clearImage}
+                                className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center"
                             >
-                                ×
+                                <X size={10} />
                             </button>
                         </div>
                     )}
 
-                    {/* Action Row */}
-                    <div
-                        className="flex items-center justify-between mt-3 pt-3 border-t"
-                        style={{ borderColor: "var(--social-border)" }}
-                    >
+                    <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center gap-2">
-                            <label className="cursor-pointer p-2 rounded-lg transition-colors hover:bg-[var(--social-card-hover)]">
-                                <ImagePlus
-                                    size={18}
-                                    style={{ color: "var(--social-text-muted)" }}
-                                />
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    hidden
-                                    onChange={handleImageSelect}
-                                />
-                            </label>
+                            <button
+                                type="button"
+                                onClick={() => fileRef.current?.click()}
+                                className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
+                                title="Add image"
+                            >
+                                <ImagePlus size={18} />
+                            </button>
+                            <input
+                                ref={fileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageChange}
+                            />
+                            <span className="text-xs text-gray-400">{content.length}/500</span>
                         </div>
 
                         <button
-                            onClick={handlePost}
-                            disabled={!content.trim() && !imageFile}
-                            className="social-btn-primary flex items-center gap-1.5 text-xs"
+                            onClick={handleSubmit}
+                            disabled={!content.trim() || isSubmitting}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-opacity-90 disabled:opacity-50 transition-all"
                         >
                             <Send size={14} />
-                            Post
+                            {isSubmitting ? "Posting..." : "Post"}
                         </button>
                     </div>
                 </div>

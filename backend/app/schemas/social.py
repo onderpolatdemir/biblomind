@@ -10,10 +10,12 @@ class BookBuddyMatch(BaseModel):
     user_id: UUID4
     email: str
     full_name: Optional[str] = None
+    username: Optional[str] = None
+    avatar_url: Optional[str] = None
     compatibility_score: float
     shared_books: int
     total_interactions: int
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -83,12 +85,29 @@ class ConnectionResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserSearchResult(BaseModel):
+    """Single user search result."""
+    user_id: UUID4
+    username: str
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserSearchResponse(BaseModel):
+    """User search results."""
+    results: List[UserSearchResult]
+    total: int
+
+
 class MyConnectionItem(BaseModel):
     """Single entry in my-connections list."""
     connection_id: UUID4
     user_id: UUID4
     email: str
     full_name: Optional[str] = None
+    username: Optional[str] = None
     compatibility_score: float
     shared_books: int
     shared_genres_count: int

@@ -11,6 +11,7 @@ type AuthContextType = {
     isLoading: boolean;
     login: (token: string, userData: User) => void;
     logout: () => void;
+    updateUser: (partial: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
     isLoading: true,
     login: () => { },
     logout: () => { },
+    updateUser: () => { },
 });
 
 // Pages that do not require authentication
@@ -77,6 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.replace('/auth/login');
     };
 
+    const updateUser = (partial: Partial<User>) => {
+        setUser((prev) => prev ? { ...prev, ...partial } : prev);
+    };
+
     if (isLoading) {
         // You could return a global loading spinner here
         return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
@@ -89,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && isPublicPath) return null; // or loading spinner
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+        <AuthContext.Provider value={{ user, isLoading, login, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

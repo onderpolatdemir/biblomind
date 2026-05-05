@@ -1,9 +1,11 @@
 """User API endpoints for profile and preferences management."""
 
 import logging
+import os
+import uuid as uuid_lib
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -19,7 +21,8 @@ from app.schemas.user import (
     UserPreferences,
     UserPreferencesUpdate,
     InteractionCreate,
-    InteractionResponse
+    InteractionResponse,
+    PublicUserResponse,
 )
 from app.schemas.book import BookResponse
 
@@ -58,19 +61,91 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Update current user's profile information.
-    
-    Currently supports updating:
-    - full_name
-    """
-    updated_user = UserService.update_user_profile(
-        db,
-        current_user.id,
-        profile_data
-    )
-    
-    return updated_user
+    """Update current user's profile (full_name, username, bio, reading_goal)."""
+    # Check username uniqueness if provided
+    if profile_data.username and profile_data.username != current_user.username:
+        existing = db.query(User).filter(User.username == profile_data.username).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already taken")
+
+    user = db.query(User).filter(User.id == current_user.id).first()
+    update_data = profile_data.model_dump(exclude_none=True)
+    for key, value in update_data.items():
+        setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload or replace the current user's avatar image."""
+    allowed_types = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG and WebP images are allowed")
+
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 5 MB)")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpg"
+    filename = f"{current_user.id}.{ext}"
+    save_path = os.path.join("static", "uploads", "avatars", filename)
+
+    with open(save_path, "wb") as f:
+        f.write(contents)
+
+    user = db.query(User).filter(User.id == current_user.id).first()
+    user.avatar_url = f"/static/uploads/avatars/{filename}"
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.get("/profile/{username}", response_model=PublicUserResponse)
+async def get_public_profile(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a user's public profile by username."""
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from app.models.user_connection import UserConnection
+    from app.models.community import CommunityMember, CommunityPost
+    from sqlalchemy import func, or_, and_
+
+    buddy_count = db.query(func.count(UserConnection.id)).filter(
+        or_(UserConnection.user_id == user.id, UserConnection.buddy_id == user.id),
+        UserConnection.status == "connected"
+    ).scalar() or 0
+
+    community_count = db.query(func.count(CommunityMember.id)).filter(
+        CommunityMember.user_id == user.id
+    ).scalar() or 0
+
+    post_count = db.query(func.count(CommunityPost.id)).filter(
+        CommunityPost.author_id == user.id
+    ).scalar() or 0
+
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "username": user.username,
+        "bio": user.bio,
+        "avatar_url": user.avatar_url,
+        "reading_goal": user.reading_goal,
+        "created_at": user.created_at,
+        "buddy_count": buddy_count,
+        "community_count": community_count,
+        "post_count": post_count,
+    }
 
 
 @router.get("/me/preferences", response_model=UserPreferences)
