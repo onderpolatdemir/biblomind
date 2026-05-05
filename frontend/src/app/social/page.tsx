@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import SocialSidebar from "@/components/social/SocialSidebar";
 import SocialRightPanel from "@/components/social/SocialRightPanel";
@@ -32,7 +31,6 @@ interface Post {
 
 export default function SocialPage() {
     const { user } = useAuth();
-    const router = useRouter();
     const [posts, setPosts] = useState<Post[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -44,7 +42,7 @@ export default function SocialPage() {
             const res = await api.get("/communities/feed", { params: { page: pg, limit: 20 } });
             const items: Post[] = res.data.posts ?? [];
             if (items.length === 0 && pg === 1) setNotInAnyCommunity(true);
-            setPosts((prev) => replace ? items : [...prev, ...items]);
+            setPosts((prev) => (replace ? items : [...prev, ...items]));
             setHasMore(items.length === 20);
         } catch {
             setPosts([]);
@@ -66,12 +64,9 @@ export default function SocialPage() {
             <Header />
             <main className="max-w-7xl mx-auto px-4 md:px-8 py-8">
                 <div className="flex gap-6">
-                    {/* Left Sidebar */}
                     <SocialSidebar />
 
-                    {/* Center Feed */}
                     <div className="flex-1 min-w-0">
-                        {/* Header */}
                         <div className="flex items-center justify-between mb-6">
                             <h1 className="text-2xl font-heading font-bold text-gray-900 flex items-center gap-2">
                                 <Globe size={22} className="text-primary" /> Social Feed
@@ -86,7 +81,7 @@ export default function SocialPage() {
 
                         {isLoading ? (
                             <div className="space-y-4">
-                                {[1, 2, 3].map(i => (
+                                {[1, 2, 3].map((i) => (
                                     <div key={i} className="h-40 bg-white rounded-2xl border border-gray-100 animate-pulse" />
                                 ))}
                             </div>
@@ -126,7 +121,6 @@ export default function SocialPage() {
                         )}
                     </div>
 
-                    {/* Right Panel */}
                     <SocialRightPanel />
                 </div>
             </main>

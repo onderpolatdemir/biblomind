@@ -16,6 +16,7 @@ from app.models.community import (
     CommunityPost, PostComment, PostLike, CommentLike, PostSave, CommunityActivity
 )
 from app.models.notification import Notification
+from app.models.association_rule import AssociationRule
 
 __all__ = [
     "User",
@@ -44,4 +45,5 @@ __all__ = [
     "PostSave",
     "CommunityActivity",
     "Notification",
+    "AssociationRule"
 ]

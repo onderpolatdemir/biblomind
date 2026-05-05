@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.book import Book
 from app.models.user_interaction import UserInteraction
+from app.models.association_rule import AssociationRule
 from app.services.openai_service import OpenAIService
 from app.services.user_service import UserService
 
@@ -212,6 +213,93 @@ class RecommendationService:
         except Exception as e:
             logger.error(f"Error finding similar books: {e}")
             raise
+            
+    async def get_checkout_recommendations(
+        self,
+        cart_book_ids: List[UUID],
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Get hybrid Apriori + Content-based recommendations for checkout.
+        """
+        try:
+            cart_ids_str = [str(bid) for bid in cart_book_ids]
+            recommendations_dict = {} # Dict to hold deduplicated books by id
+            
+            # Step 1: Apriori Rules Fetch
+            if cart_ids_str:
+                rules = self.db.query(AssociationRule, Book).join(
+                    Book, AssociationRule.consequent_id == Book.id
+                ).filter(
+                    AssociationRule.antecedent_id.in_(cart_ids_str),
+                    AssociationRule.consequent_id.notin_(cart_ids_str),
+                    Book.stock > 0
+                ).order_by(AssociationRule.lift.desc()).limit(limit * 2).all()
+                
+                for rule, book in rules:
+                    if str(book.id) not in recommendations_dict and len(recommendations_dict) < limit:
+                        recommendations_dict[str(book.id)] = {
+                            "book": self._format_book(book),
+                            "score": min(1.0, float(rule.lift) / 10.0), # Normalize lift loosely
+                            "match_reasons": ["frequently_bought_together"],
+                            "explanation": "Customers who bought items in your cart also bought this book."
+                        }
+                        
+            # Step 2: Hybrid Fallback if not enough Apriori rules
+            if len(recommendations_dict) < limit and cart_ids_str:
+                remaining_slots = limit - len(recommendations_dict)
+                
+                # Find genres and authors of books in cart
+                cart_books = self.db.query(Book).filter(Book.id.in_(cart_ids_str)).all()
+                cart_authors = [b.author for b in cart_books if b.author]
+                cart_genres = []
+                for b in cart_books:
+                    if b.genres:
+                        cart_genres.extend(b.genres)
+                
+                # Fetch books matching genres/authors
+                query = self.db.query(Book).filter(
+                    Book.id.notin_(cart_ids_str),
+                    Book.stock > 0
+                )
+                
+                # To avoid complex OR condition lists lacking matches, let's do a fast query
+                # prioritizing the same authors or overlapping genres.
+                from sqlalchemy import cast, String
+                if cart_authors and cart_genres:
+                    genre_conditions = [cast(Book.genres, String).ilike(f'%{g}%') for g in cart_genres[:3]]
+                    query = query.filter(or_(Book.author.in_(cart_authors), *genre_conditions))
+                elif cart_genres:
+                    genre_conditions = [cast(Book.genres, String).ilike(f'%{g}%') for g in cart_genres[:3]]
+                    query = query.filter(or_(*genre_conditions))
+                elif cart_authors:
+                    query = query.filter(Book.author.in_(cart_authors))
+                    
+                fallback_books = query.limit(remaining_slots * 2).all()
+                
+                for book in fallback_books:
+                    if str(book.id) not in recommendations_dict and len(recommendations_dict) < limit:
+                        is_author_match = book.author in cart_authors
+                        recommendations_dict[str(book.id)] = {
+                            "book": self._format_book(book),
+                            "score": 0.5,
+                            "match_reasons": ["similar_author" if is_author_match else "similar_genre"],
+                            "explanation": f"Similar to the {'authors' if is_author_match else 'genres'} in your cart."
+                        }
+            
+            final_recs = list(recommendations_dict.values())
+            # Sort by score descending
+            final_recs.sort(key=lambda x: x["score"], reverse=True)
+            
+            return {
+                "recommendations": final_recs,
+                "total": len(final_recs),
+                "strategy": "checkout_hybrid",
+                "user_has_history": True
+            }
+        except Exception as e:
+            logger.error(f"Error fetching checkout recommendations: {e}")
+            raise
     
     async def update_user_preference_vector(
         self,
@@ -328,6 +416,13 @@ class RecommendationService:
         # Increase candidate pool to find more diverse matches (author/genre)
         results = query.order_by('distance').limit(limit * 10).all()
         
+        # Get user preferences
+        user_prefs = {}
+        try:
+            user_prefs = await UserService.get_user_reading_profile(self.db, user.id, self.openai_service)
+        except Exception as e:
+            logger.warning(f"Could not load user_prefs for user {user.id}: {e}")
+
         # Format results
         recommendations = []
         for book, distance in results:

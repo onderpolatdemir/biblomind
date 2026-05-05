@@ -56,6 +56,7 @@ export default function PostComposer({ communityId, onPost, authorInitial = "U" 
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-text flex-shrink-0">
                     {authorInitial}
                 </div>
+
                 <div className="flex-1">
                     <textarea
                         value={content}
@@ -88,9 +89,16 @@ export default function PostComposer({ communityId, onPost, authorInitial = "U" 
                             >
                                 <ImagePlus size={18} />
                             </button>
-                            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                            <input
+                                ref={fileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageChange}
+                            />
                             <span className="text-xs text-gray-400">{content.length}/500</span>
                         </div>
+
                         <button
                             onClick={handleSubmit}
                             disabled={!content.trim() || isSubmitting}

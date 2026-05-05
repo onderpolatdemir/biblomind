@@ -43,17 +43,14 @@ export default function SocialSidebar() {
 
                 {isLoading ? (
                     <div className="space-y-2">
-                        {[1, 2, 3].map(i => (
+                        {[1, 2, 3].map((i) => (
                             <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
                         ))}
                     </div>
                 ) : communities.length === 0 ? (
                     <div className="text-center py-6">
                         <p className="text-xs text-gray-400 mb-3">You haven't joined any communities yet.</p>
-                        <Link
-                            href="/social/communities"
-                            className="text-xs font-bold text-primary hover:underline"
-                        >
+                        <Link href="/social/communities" className="text-xs font-bold text-primary hover:underline">
                             Explore Communities →
                         </Link>
                     </div>
@@ -61,8 +58,11 @@ export default function SocialSidebar() {
                     <div className="space-y-1">
                         {communities.map((c) => {
                             const avatarSrc = c.profile_photo_url
-                                ? (c.profile_photo_url.startsWith("http") ? c.profile_photo_url : `${BACKEND_URL}${c.profile_photo_url}`)
+                                ? c.profile_photo_url.startsWith("http")
+                                    ? c.profile_photo_url
+                                    : `${BACKEND_URL}${c.profile_photo_url}`
                                 : null;
+
                             return (
                                 <Link
                                     key={c.id}

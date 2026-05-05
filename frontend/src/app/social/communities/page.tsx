@@ -34,7 +34,7 @@ export default function CommunitiesPage() {
                 params: { search: q || undefined, page: pg, limit: 20 },
             });
             const items: Community[] = res.data.communities ?? [];
-            setCommunities((prev) => replace ? items : [...prev, ...items]);
+            setCommunities((prev) => (replace ? items : [...prev, ...items]));
             setHasMore(items.length === 20);
         } catch {
             setCommunities([]);
@@ -57,7 +57,6 @@ export default function CommunitiesPage() {
         <div className="min-h-screen bg-gray-50/50 font-body">
             <Header />
             <main className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-                {/* Hero */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h1 className="text-3xl font-heading font-bold text-gray-900 mb-1">Communities</h1>
@@ -71,7 +70,6 @@ export default function CommunitiesPage() {
                     </button>
                 </div>
 
-                {/* Search */}
                 <div className="relative mb-8 max-w-md">
                     <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
@@ -83,7 +81,6 @@ export default function CommunitiesPage() {
                     />
                 </div>
 
-                {/* Grid */}
                 {isLoading && communities.length === 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                         {Array.from({ length: 10 }).map((_, i) => (

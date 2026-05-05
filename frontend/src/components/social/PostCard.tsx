@@ -55,7 +55,7 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
         try {
             const res = await api.post(`/communities/posts/${post.id}/like`);
             setLiked(res.data.toggled);
-            setLikeCount((n) => res.data.toggled ? n + 1 : n - 1);
+            setLikeCount((n) => (res.data.toggled ? n + 1 : n - 1));
         } catch {}
     };
 
@@ -63,7 +63,7 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
         try {
             const res = await api.post(`/communities/posts/${post.id}/save`);
             setSaved(res.data.toggled);
-            setSaveCount((n) => res.data.toggled ? n + 1 : n - 1);
+            setSaveCount((n) => (res.data.toggled ? n + 1 : n - 1));
         } catch {}
     };
 
@@ -86,7 +86,8 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
             setComments((prev) => [res.data, ...prev]);
             setCommentCount((n) => n + 1);
             setNewComment("");
-        } catch {} finally {
+        } catch {
+        } finally {
             setSubmitting(false);
         }
     };
@@ -100,11 +101,15 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
     };
 
     const imageSrc = post.image_url
-        ? (post.image_url.startsWith("http") ? post.image_url : `${BACKEND_URL}${post.image_url}`)
+        ? post.image_url.startsWith("http")
+            ? post.image_url
+            : `${BACKEND_URL}${post.image_url}`
         : null;
 
     const authorAvatarSrc = post.author_avatar
-        ? (post.author_avatar.startsWith("http") ? post.author_avatar : `${BACKEND_URL}${post.author_avatar}`)
+        ? post.author_avatar.startsWith("http")
+            ? post.author_avatar
+            : `${BACKEND_URL}${post.author_avatar}`
         : null;
 
     const fmtTime = (iso: string) => {
@@ -117,7 +122,6 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {/* Header */}
             <div className="flex items-center gap-3 px-5 pt-4 pb-2">
                 <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex items-center justify-center font-bold text-text flex-shrink-0">
                     {authorAvatarSrc ? (
@@ -126,19 +130,27 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
                         post.author_name?.charAt(0).toUpperCase()
                     )}
                 </div>
+
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                         {post.author_username ? (
-                            <Link href={`/profile/${post.author_username}`} className="font-bold text-sm text-gray-800 hover:text-primary transition-colors">
+                            <Link
+                                href={`/profile/${post.author_username}`}
+                                className="font-bold text-sm text-gray-800 hover:text-primary transition-colors"
+                            >
                                 {post.author_name}
                             </Link>
                         ) : (
                             <span className="font-bold text-sm text-gray-800">{post.author_name}</span>
                         )}
+
                         {showCommunity && (
                             <>
                                 <span className="text-gray-400 text-xs">in</span>
-                                <Link href={`/social/communities/${post.community_id}`} className="text-xs font-medium text-primary hover:underline">
+                                <Link
+                                    href={`/social/communities/${post.community_id}`}
+                                    className="text-xs font-medium text-primary hover:underline"
+                                >
                                     {post.community_name}
                                 </Link>
                             </>
@@ -146,6 +158,7 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
                     </div>
                     <p className="text-xs text-gray-400">{fmtTime(post.created_at)}</p>
                 </div>
+
                 {post.is_mine && (
                     <button
                         onClick={() => onDelete?.(post.id)}
@@ -156,31 +169,27 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
                 )}
             </div>
 
-            {/* Content */}
             <div className="px-5 pb-3">
                 <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{post.content}</p>
             </div>
 
-            {/* Image */}
             {imageSrc && (
                 <div className="px-5 pb-3">
-                    <img
-                        src={imageSrc}
-                        alt="post"
-                        className="w-full rounded-xl object-cover max-h-80"
-                    />
+                    <img src={imageSrc} alt="post" className="w-full rounded-xl object-cover max-h-80" />
                 </div>
             )}
 
-            {/* Actions */}
             <div className="px-5 pb-3 flex items-center gap-4 border-t border-gray-50 pt-3">
                 <button
                     onClick={toggleLike}
-                    className={`flex items-center gap-1.5 text-sm transition-colors ${liked ? "text-red-500" : "text-gray-400 hover:text-red-500"}`}
+                    className={`flex items-center gap-1.5 text-sm transition-colors ${
+                        liked ? "text-red-500" : "text-gray-400 hover:text-red-500"
+                    }`}
                 >
                     <Heart size={16} className={liked ? "fill-red-500" : ""} />
                     <span className="text-xs">{likeCount}</span>
                 </button>
+
                 <button
                     onClick={openComments}
                     className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-primary transition-colors"
@@ -188,19 +197,20 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
                     <MessageCircle size={16} />
                     <span className="text-xs">{commentCount}</span>
                 </button>
+
                 <button
                     onClick={toggleSave}
-                    className={`flex items-center gap-1.5 text-sm ml-auto transition-colors ${saved ? "text-primary" : "text-gray-400 hover:text-primary"}`}
+                    className={`flex items-center gap-1.5 text-sm ml-auto transition-colors ${
+                        saved ? "text-primary" : "text-gray-400 hover:text-primary"
+                    }`}
                 >
                     <Bookmark size={16} className={saved ? "fill-primary" : ""} />
                     <span className="text-xs">{saveCount}</span>
                 </button>
             </div>
 
-            {/* Comments */}
             {showComments && (
                 <div className="border-t border-gray-50 px-5 pb-4 pt-3 space-y-3">
-                    {/* Comment input */}
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -219,7 +229,6 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
                         </button>
                     </div>
 
-                    {/* Comment list */}
                     {comments.map((c) => (
                         <div key={c.id} className="flex gap-2">
                             <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-text flex-shrink-0">

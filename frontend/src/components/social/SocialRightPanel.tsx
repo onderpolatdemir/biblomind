@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Clock, Compass } from "lucide-react";
 import api from "@/lib/api";
-import CommunityCard from "./CommunityCard";
 
 interface ActivityItem {
     id: string;
@@ -36,13 +35,18 @@ export default function SocialRightPanel() {
             .catch(() => {});
 
         api.get("/communities/?limit=3")
-            .then((r) => setSuggested((r.data.communities ?? []).filter((c: Community) => !c.is_member).slice(0, 3)))
+            .then((r) =>
+                setSuggested(
+                    (r.data.communities ?? [])
+                        .filter((c: Community) => !c.is_member)
+                        .slice(0, 3)
+                )
+            )
             .catch(() => {});
     }, []);
 
     return (
         <aside className="w-72 flex-shrink-0 space-y-4">
-            {/* Recent Activity */}
             {activities.length > 0 && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                     <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 mb-3">
@@ -58,10 +62,14 @@ export default function SocialRightPanel() {
                                         {a.target && <span className="text-gray-500"> — {a.target}</span>}
                                     </p>
                                     <p className="text-[10px] text-gray-400">
-                                        <Link href={`/social/communities/${a.community_id}`} className="hover:underline text-primary">
+                                        <Link
+                                            href={`/social/communities/${a.community_id}`}
+                                            className="hover:underline text-primary"
+                                        >
                                             {a.community_name}
                                         </Link>
-                                        {" · "}{a.relative_time}
+                                        {" · "}
+                                        {a.relative_time}
                                     </p>
                                 </div>
                             </div>
@@ -70,7 +78,6 @@ export default function SocialRightPanel() {
                 </div>
             )}
 
-            {/* Suggested Communities */}
             {suggested.length > 0 && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -88,7 +95,10 @@ export default function SocialRightPanel() {
                                     {c.name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <Link href={`/social/communities/${c.id}`} className="text-sm font-medium text-gray-800 hover:text-primary truncate block">
+                                    <Link
+                                        href={`/social/communities/${c.id}`}
+                                        className="text-sm font-medium text-gray-800 hover:text-primary truncate block"
+                                    >
                                         {c.name}
                                     </Link>
                                     <p className="text-xs text-gray-400">{c.member_count} members</p>

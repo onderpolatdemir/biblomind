@@ -6,7 +6,7 @@ import Header from "@/components/layout/Header";
 import PostCard from "@/components/social/PostCard";
 import PostComposer from "@/components/social/PostComposer";
 import { useAuth } from "@/context/AuthContext";
-import { Users, Lock, Globe, Trash2, Settings } from "lucide-react";
+import { Users, Lock, Globe, Settings } from "lucide-react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
 
@@ -114,13 +114,17 @@ export default function CommunityDetailPage() {
         try {
             if (community.is_member) {
                 await api.post(`/communities/${id}/leave`);
-                setCommunity((c) => c ? { ...c, is_member: false, user_role: null, member_count: c.member_count - 1 } : c);
+                setCommunity((c) =>
+                    c ? { ...c, is_member: false, user_role: null, member_count: c.member_count - 1 } : c
+                );
             } else {
                 const res = await api.post(`/communities/${id}/join`);
                 if (res.data?.status === "pending") {
-                    setCommunity((c) => c ? { ...c, join_request_status: "pending" } : c);
+                    setCommunity((c) => (c ? { ...c, join_request_status: "pending" } : c));
                 } else {
-                    setCommunity((c) => c ? { ...c, is_member: true, user_role: "member", member_count: c.member_count + 1 } : c);
+                    setCommunity((c) =>
+                        c ? { ...c, is_member: true, user_role: "member", member_count: c.member_count + 1 } : c
+                    );
                 }
             }
         } catch {}
@@ -147,38 +151,55 @@ export default function CommunityDetailPage() {
     if (!community) return null;
 
     const bannerSrc = community.banner_photo_url
-        ? (community.banner_photo_url.startsWith("http") ? community.banner_photo_url : `${BACKEND_URL}${community.banner_photo_url}`)
+        ? community.banner_photo_url.startsWith("http")
+            ? community.banner_photo_url
+            : `${BACKEND_URL}${community.banner_photo_url}`
         : null;
 
     const profileSrc = community.profile_photo_url
-        ? (community.profile_photo_url.startsWith("http") ? community.profile_photo_url : `${BACKEND_URL}${community.profile_photo_url}`)
+        ? community.profile_photo_url.startsWith("http")
+            ? community.profile_photo_url
+            : `${BACKEND_URL}${community.profile_photo_url}`
         : null;
 
     const canPost = community.is_member;
-    const isModerator = ["creator", "admin"].includes(community.user_role ?? "");
 
     return (
         <div className="min-h-screen bg-gray-50/50 font-body">
             <Header />
             <main className="max-w-4xl mx-auto px-4 py-8">
-                {/* Community Header */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
                     <div
                         className="h-36 bg-gradient-to-r from-primary/20 to-secondary/40"
-                        style={bannerSrc ? { backgroundImage: `url(${bannerSrc})`, backgroundSize: "cover", backgroundPosition: "center" } : {}}
+                        style={
+                            bannerSrc
+                                ? { backgroundImage: `url(${bannerSrc})`, backgroundSize: "cover", backgroundPosition: "center" }
+                                : {}
+                        }
                     />
                     <div className="px-6 pb-6">
                         <div className="flex items-end gap-4 -mt-10 mb-4">
                             <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-md overflow-hidden bg-primary/10 flex items-center justify-center font-bold text-primary text-3xl flex-shrink-0">
-                                {profileSrc ? <img src={profileSrc} alt={community.name} className="w-full h-full object-cover" /> : community.name.charAt(0).toUpperCase()}
+                                {profileSrc ? (
+                                    <img src={profileSrc} alt={community.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    community.name.charAt(0).toUpperCase()
+                                )}
                             </div>
                             <div className="flex-1 min-w-0 pb-1">
                                 <div className="flex items-center gap-2">
                                     <h1 className="text-2xl font-bold text-gray-900 truncate">{community.name}</h1>
-                                    {community.privacy === "private" ? <Lock size={16} className="text-gray-400" /> : <Globe size={16} className="text-gray-400" />}
+                                    {community.privacy === "private" ? (
+                                        <Lock size={16} className="text-gray-400" />
+                                    ) : (
+                                        <Globe size={16} className="text-gray-400" />
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 text-sm text-gray-500">
-                                    <span className="flex items-center gap-1"><Users size={14} />{community.member_count} members</span>
+                                    <span className="flex items-center gap-1">
+                                        <Users size={14} />
+                                        {community.member_count} members
+                                    </span>
                                     <span>{community.post_count} posts</span>
                                 </div>
                             </div>
@@ -191,57 +212,67 @@ export default function CommunityDetailPage() {
                                 {!community.is_creator && (
                                     <button
                                         onClick={toggleMembership}
-                                        disabled={community.join_request_status === "pending" || community.join_request_status === "rejected"}
+                                        disabled={
+                                            community.join_request_status === "pending" ||
+                                            community.join_request_status === "rejected"
+                                        }
                                         className={`px-5 py-2 rounded-xl font-bold text-sm transition-all disabled:cursor-not-allowed ${
                                             community.is_member
                                                 ? "border-2 border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500"
                                                 : community.join_request_status === "pending"
-                                                    ? "bg-gray-100 text-gray-400 border-2 border-gray-200"
-                                                    : community.join_request_status === "rejected"
-                                                        ? "bg-red-50 text-red-400 border-2 border-red-200"
-                                                        : "bg-primary text-white hover:bg-opacity-90"
+                                                  ? "bg-gray-100 text-gray-400 border-2 border-gray-200"
+                                                  : community.join_request_status === "rejected"
+                                                    ? "bg-red-50 text-red-400 border-2 border-red-200"
+                                                    : "bg-primary text-white hover:bg-opacity-90"
                                         }`}
                                     >
                                         {community.is_member
                                             ? "Leave"
                                             : community.join_request_status === "pending"
-                                                ? "Request Pending"
-                                                : community.join_request_status === "rejected"
-                                                    ? "Request Denied"
-                                                    : community.privacy === "private"
-                                                        ? "Request to Join"
-                                                        : "Join"}
+                                              ? "Request Pending"
+                                              : community.join_request_status === "rejected"
+                                                ? "Request Denied"
+                                                : community.privacy === "private"
+                                                  ? "Request to Join"
+                                                  : "Join"}
                                     </button>
                                 )}
                             </div>
                         </div>
-                        {community.description && (
-                            <p className="text-gray-600 text-sm mb-4">{community.description}</p>
-                        )}
+
+                        {community.description && <p className="text-gray-600 text-sm mb-4">{community.description}</p>}
+
                         {community.category_tags.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {community.category_tags.map((tag) => (
-                                    <span key={tag} className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium">{tag}</span>
+                                    <span
+                                        key={tag}
+                                        className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium"
+                                    >
+                                        {tag}
+                                    </span>
                                 ))}
                             </div>
                         )}
-                    </div>
 
-                    {/* Tabs */}
-                    <div className="flex border-t border-gray-100">
-                        {(["posts", "members", "about"] as Tab[]).map((t) => (
-                            <button
-                                key={t}
-                                onClick={() => handleTabChange(t)}
-                                className={`flex-1 py-3 text-sm font-bold capitalize transition-colors ${tab === t ? "text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-                            >
-                                {t}
-                            </button>
-                        ))}
+                        <div className="flex border-t border-gray-100 mt-6">
+                            {(["posts", "members", "about"] as Tab[]).map((t) => (
+                                <button
+                                    key={t}
+                                    onClick={() => handleTabChange(t)}
+                                    className={`flex-1 py-3 text-sm font-bold capitalize transition-colors ${
+                                        tab === t
+                                            ? "text-primary border-b-2 border-primary"
+                                            : "text-gray-500 hover:text-gray-700"
+                                    }`}
+                                >
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                {/* Tab Content */}
                 {tab === "posts" && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                         {community.privacy === "private" && !community.is_member ? (
@@ -252,8 +283,8 @@ export default function CommunityDetailPage() {
                                     {community.join_request_status === "pending"
                                         ? "Your request is being reviewed by the community creator."
                                         : community.join_request_status === "rejected"
-                                            ? "Your join request was not approved."
-                                            : "Request to join to view and participate in discussions."}
+                                          ? "Your join request was not approved."
+                                          : "Request to join to view and participate in discussions."}
                                 </p>
                             </div>
                         ) : (
@@ -265,6 +296,7 @@ export default function CommunityDetailPage() {
                                         authorInitial={user?.full_name?.charAt(0).toUpperCase() || "U"}
                                     />
                                 )}
+
                                 {postsLoading ? (
                                     <div className="flex justify-center py-12">
                                         <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
@@ -272,12 +304,14 @@ export default function CommunityDetailPage() {
                                 ) : posts.length === 0 ? (
                                     <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
                                         <p className="text-gray-400">No posts yet.</p>
-                                        {canPost && <p className="text-sm text-gray-400 mt-1">Be the first to share something!</p>}
+                                        {canPost && (
+                                            <p className="text-sm text-gray-400 mt-1">
+                                                Be the first to share something!
+                                            </p>
+                                        )}
                                     </div>
                                 ) : (
-                                    posts.map((post) => (
-                                        <PostCard key={post.id} post={post} onDelete={deletePost} />
-                                    ))
+                                    posts.map((post) => <PostCard key={post.id} post={post} onDelete={deletePost} />)
                                 )}
                             </>
                         )}
@@ -285,25 +319,44 @@ export default function CommunityDetailPage() {
                 )}
 
                 {tab === "members" && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                    >
                         <div className="px-5 py-4 border-b border-gray-50 text-sm font-bold text-gray-600">
                             {community.member_count} Members
                         </div>
                         <div className="divide-y divide-gray-50">
                             {members.map((m) => {
                                 const avatarSrc = m.avatar_url
-                                    ? (m.avatar_url.startsWith("http") ? m.avatar_url : `${BACKEND_URL}${m.avatar_url}`)
+                                    ? m.avatar_url.startsWith("http")
+                                        ? m.avatar_url
+                                        : `${BACKEND_URL}${m.avatar_url}`
                                     : null;
+
                                 return (
                                     <div key={m.user_id} className="flex items-center gap-3 px-5 py-3">
                                         <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex items-center justify-center font-bold text-text flex-shrink-0">
-                                            {avatarSrc ? <img src={avatarSrc} alt={m.full_name} className="w-full h-full object-cover" /> : m.full_name?.charAt(0).toUpperCase()}
+                                            {avatarSrc ? (
+                                                <img src={avatarSrc} alt={m.full_name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                m.full_name?.charAt(0).toUpperCase()
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-sm text-gray-800 truncate">{m.full_name}</p>
                                             {m.username && <p className="text-xs text-primary">@{m.username}</p>}
                                         </div>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold capitalize ${m.role === "creator" ? "bg-primary/10 text-primary" : m.role === "admin" ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"}`}>
+                                        <span
+                                            className={`text-xs px-2 py-0.5 rounded-full font-bold capitalize ${
+                                                m.role === "creator"
+                                                    ? "bg-primary/10 text-primary"
+                                                    : m.role === "admin"
+                                                      ? "bg-orange-100 text-orange-600"
+                                                      : "bg-gray-100 text-gray-500"
+                                            }`}
+                                        >
                                             {m.role === "moderator" ? "member" : m.role}
                                         </span>
                                     </div>

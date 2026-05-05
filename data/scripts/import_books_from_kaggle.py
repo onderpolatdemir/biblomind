@@ -252,6 +252,7 @@ def parse_kaggle_csv(csv_path: str, limit: int = 500, download_covers: bool = Fa
                 # Use parsed genres if valid
                 if genres_list:
                     genres = genres_list[:3]  # Max 3 genres
+                    
                 else:
                     # Fallback to inference
                     genres = infer_genres(title, authors)

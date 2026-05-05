@@ -1,0 +1,256 @@
+--- PARAGRAPHS ---
+AKDENIZ UNIVERSITY
+FACULTY OF ENGINEERING
+DEPARTMENT OF COMPUTER ENGINEERING
+ BiblioMind Progress Report - Content Sections
+Kaan Yılmaz
+Barış Ayhan
+Önder Polatdemir
+GRADUATION SENIOR PROJECT REPORT
+SUPERVISOR: Assoc. Prof. Dr. Taner Danışman
+JAN/JUNE 2026
+ANTALYA
+APPROVAL OF GRADUATION SENIOR PROJECT 
+The B.S. Graduation Thesis titled “BiblioMind: AI-Powered Book Discovery Platform” prepared by  Kaan YILMAZ, Barış AYHAN,  and Önder POLATDEMİR has been unanimously approved as a Graduation Senior Project at Akdeniz University, Faculty of Engineering, Computer Engineering Department.
+JURY MEMBERS
+ABSTRACT
+BiblioMind: AI-POWERED BOOK DISCOVERY PLATFORM
+Kaan YILMAZ, Barış AYHAN , Önder POLATDEMİR
+Graduation Senior Project in Computer Engineering
+Supervisor: Assoc. Prof. Dr. Taner DANIŞMAN
+Jan/June 2026; 18 pages
+BiblioMind is an "AI-Powered Book Discovery Platform" designed to bring the personalized experience of the digital world to physical libraries and bookstores. Unlike traditional e-commerce sites, BiblioMind focuses not only on the user's purchase history but also on instant visual inputs and deep literary preferences. 
+The most crucial feature of the project is enabling the user to photograph someone else's bookshelf and discover the works best suited to them from that collection via artificial intelligence.
+The system architecture utilizes FastAPI for high-performance asynchronous backend processing and Next.js for a responsive frontend interface. The core functionality relies on Google Cloud Vision API for Optical Character Recognition (OCR) to extract book titles from images. These titles are then matched against a vector database (PostgreSQL + pgvector) containing semantic summaries of books. Finally, a Large Language Model (LLM) generates personalized, empathic explanations for each recommendation, constituting the "Why Module".
+This report details the progress made during the first phase of development, including the establishment of the database schema, the integration of the Vision API, and the implementation of the core recommendation algorithms. The initial results demonstrate the system's ability to successfully digitize a physical shelf and retrieve semantically relevant book suggestions.
+KEYWORDS: Artificial Intelligence, Book Discovery, Computer Vision, Recommendation Systems, OCR, NLP, Vector Database.
+FOREWORD
+We would like to express our deepest gratitude to our supervisor, Assoc. Prof. Dr. Taner DANIŞMAN, for his invaluable guidance, technical insights, and continuous support throughout the development of the BiblioMind project. His expertise in computer vision and software engineering has been instrumental in shaping the architecture of our system.
+We also extend our thanks to the faculty members of the Akdeniz University Computer Engineering Department for providing us with the necessary educational foundation and laboratory resources to conduct this study.
+We are also grateful to our families for their endless patience, encouragement, and belief in us during this intensive work period. Their support has been our greatest motivation. Finally, we thank each other as team members for the collaborative spirit, dedication, and hard work put into realizing this project.
+ Kaan YILMAZ, Barış AYHAN, Önder POLATDEMİR,
+TABLE OF CONTENTS
+APPROVAL OF GRADUATION SENIOR PROJECT	i
+ABSTRACT	ii
+FOREWORD	iii
+TABLE OF CONTENTS	iv
+SYMBOLS AND ABBREVIATIONS	vi
+LIST OF FIGURES	vii
+LIST OF TABLES	viii
+1. INTRODUCTION	1
+1.1 Background	1
+1.2 Problem Statement	1
+1.3 Objectives	1
+1.4 Scope	2
+2. LITERATURE REVIEW (THIS TITLE CAN BE CHANGED)	3
+2.1.	Notation of Figures	3
+2.2. Notation of Tables	4
+3. MATERIAL AND METHOD	6
+3.2. Citations	8
+3.2.1. Third level title	9
+3.3. Quotations	9
+4. RESULTS	10
+5. CONCLUSIONS	11
+6. REFERENCES	13
+CURRICULUM VITAE
+SYMBOLS AND ABBREVIATIONS
+API - Application Programming Interface 
+CRUD - Create, Read, Update, Delete 
+DBMS - Database Management System 
+GCP - Google Cloud Platform 
+GPT - Generative Pre-trained Transformer 
+HTTP - Hypertext Transfer Protocol 
+JWT - JSON Web Token 
+LLM - Large Language Model 
+NLP - Natural Language Processing 
+OCR - Optical Character Recognition 
+ORM - Object-Relational Mapping 
+PWA - Progressive Web Application 
+RAG - Retrieval-Augmented Generation 
+REST - Representational State Transfer 
+SQL - Structured Query Language 
+UI/UX - User Interface/User Experience 
+UUID - Universally Unique Identifier 
+VCS - Version Control System
+LIST OF FIGURES
+Figure 2.1. BiblioMind System Architecture Diagram .......................................................... 3
+Figure 2.2. Data Flow Diagram - Book Recommendation from Photo................................... 7
+LIST OF TABLES
+Table 2.5. Cosine Similarity scores.	4
+Table 2.6. Database Schema Specifications……………………………………………. 5
+1. INTRODUCTION
+1.1 Background
+The digital transformation of the book industry has created new opportunities for readers to discover and purchase books online. However, existing recommendation systems often rely on explicit user preferences or purchase history, which may not accurately reflect a user's reading interests. Additionally, many readers maintain physical book collections that are not integrated into digital discovery platforms.
+BiblioMind addresses these limitations by introducing a novel approach to book discovery that combines computer vision, semantic understanding, and personalized recommendation algorithms. The platform allows users to photograph their existing book collections and receive intelligent recommendations based on the semantic similarity between their current books and potential new reads.
+1.2 Problem Statement
+Traditional book recommendation systems face several challenges:
+1. Limited Context Understanding: Most systems rely on explicit ratings or purchase history, which may not capture the nuanced preferences of readers.
+2. Disconnect Between Physical and Digital: Readers with physical book collections cannot easily leverage their existing books for digital discovery.
+3. Generic Recommendations: Many platforms provide generic recommendations that do not account for the specific reading patterns and preferences of individual users.
+4. Inefficient Discovery Process: Users often spend significant time browsing through irrelevant suggestions before finding books that match their interests.
+1.3 Objectives
+The primary objectives of the BiblioMind project are:
+1. Photo-Based Recognition: Develop a robust system that can identify books from photographs of bookshelves using OCR and computer vision techniques.
+2. Semantic Understanding: Implement a recommendation engine that understands the semantic content of books and user preferences using vector embeddings.
+3. Personalized Recommendations: Create a personalized recommendation system that suggests books based on semantic similarity to a user's existing collection.
+4. E-Commerce Integration: Provide a seamless e-commerce experience that allows users to purchase recommended books directly through the platform.
+5. Scalable Architecture: Design and implement a scalable system architecture that can handle growing user bases and book catalogs.
+1.4 Scope
+This project encompasses:
+- Backend API development using FastAPI
+- Frontend development using Next.js 14
+- Database design and implementation with PostgreSQL and pgvector
+- Integration with Google Cloud Vision API for image processing
+- Integration with OpenAI API for embeddings and text generation
+- Implementation of vector similarity search algorithms
+- Development of user authentication and authorization systems
+- E-commerce functionality including cart management and order processing
+- Deployment infrastructure using Docker and cloud services
+1.5 Significance
+BiblioMind represents a significant advancement in book discovery technology by:
+- Bridging the gap between physical and digital book collections
+- Leveraging state-of-the-art AI technologies for personalized recommendations
+- Demonstrating practical applications of vector databases in recommendation systems
+- Providing a user-friendly interface for book discovery and purchase
+2. LITERATURE REVIEW
+The BiblioMind platform is built on a modern, scalable microservices architecture. The system is divided into a Client Layer (Frontend), an API Layer (Backend), an AI Layer, and a Data Layer.
+ Notation of Figures
+Figure 2.1. System Architecture Diagram
+Figure 2.2. Data Flow Diagram - Book Recommendation from Photo
+2.2. Notation of Tables
+Theorem 2.1. Cosine Similarity Definition. Given two non-zero vectors A and B in an n-dimensional space, the Cosine Similarity is defined as the cosine of the angle θ between them. It is calculated by the dot product of the vectors divided by the product of their magnitudes:
+This metric is invariant to vector magnitude and relies only on the orientation, making it ideal for comparing semantic text embeddings.
+Example 2.1. Calculation of Similarity Score. Suppose we have a simplified User Preference Vector U = [3, 1] and a Book Vector B = [2, 4]. The similarity is calculated as follows:
+A score of 0.707 indicates a moderate positive correlation between the user's preference and the book.
+Theorem 2.2.  Recommendation Ranking Optimality. Given a set of n books with embeddings B = {b1, b2, b3, ... , bn} and a user preference vector u, the top-k recommendation set Rk that maximizes the average similarity is obtained by:
+This is achieved by selecting the k books with the highest cosine similarity scores, which can be efficiently computed using pgvector's index
+The application of this theorem in our system follows these steps:
+Photo Analysis: Google Cloud Vision API extracts book titles from uploaded photographs.
+Book Matching: Detected titles are matched against the database using fuzzy matching algorithms.
+User Profile Retrieval: The system retrieves the user's preference vector from the database.
+Similarity Calculation: Cosine similarity is calculated between the user's preference vector and all book embeddings using Theorem 2.1.
+Ranking: Books are ranked by similarity score and the top 5 are selected according to Theorem 2.2.
+Explanation Generation: GPT-4o generates personalized explanations for each recommendation.
+Table 2.1. Example ranking of books based on computed Cosine Similarity scores.
+Table 2.2: Database Schema Specifications
+3. MATERIAL AND METHOD
+This section details the engineering resources, software architecture, and procedural methodologies applied to realize the BiblioMind platform. While Section 2 established the theoretical foundations of the similarity algorithms, this section focuses on the practical implementation, data pipelines, and integration strategies.
+3.1. Materials
+The material basis of the project consists of the technology stack selected for high-performance AI processing and the datasets curated for the recommendation engine.
+3.1.1. Technology Stack
+The system is built upon a microservices architecture utilizing the following core components:
+Backend Engine: FastAPI (Python) was selected as the primary web framework due to its native support for asynchronous I/O operations. This is critical for managing concurrent requests to external AI services (OpenAI and Google Cloud) without blocking the main thread, ensuring high throughput.
+Database Systems:
+PostgreSQL with pgvector: Serves as the persistent storage for user data and book metadata. The pgvector extension is instrumental for storing 1536-dimensional embedding vectors and performing nearest neighbor searches.
+Elasticsearch: Deployed to handle fuzzy string matching and keyword-based search queries, providing resilience against OCR errors (e.g., misspelling "Orwell" as "0rwell").
+Redis: Utilized as an in-memory data structure store to cache frequent queries and manage user sessions, reducing latency.
+Frontend Interface: Next.js (React) is employed to provide a server-side rendered (SSR) interface, optimizing the application for search engine visibility and initial load performance.
+AI Services:
+Google Cloud Vision API: Used for text detection (OCR) and object segmentation within images.
+OpenAI API: Provides the text-embedding-3-large model for vectorization and gpt-4o for generating natural language explanations.
+3.1.2. Data Collection and Preparation
+To establish a functional MVP, a dataset of approximately 10,000 books was aggregated from open-source repositories (Goodreads and Open Library). The raw data underwent a cleaning process to normalize author names and remove incomplete entries.
+3.2. Methodology
+The development methodology follows a pipeline approach, processing raw inputs (images or text) through distinct stages to generate the final recommendation.
+3.2.1. Vectorization Pipeline
+Before the system can recommend books, the text data must be converted into a machine-understandable format.
+Summarization: Book descriptions are concatenated with metadata (Title, Author, Genre).
+Embedding Generation: This combined text is passed through the embedding model to generate a high-dimensional vector.
+Indexing: These vectors are stored in PostgreSQL using an IVFFlat (Inverted File with Flat Compression) index. This indexing method allows for approximate nearest neighbor search, which significantly speeds up the retrieval process described in the theoretical framework.
+3.2.2. Visual Data Processing (The Vision Pipeline)
+A specific challenge identified in the requirements was the recognition of book spines, which are often thin, curved, or feature vertical text. To address this, a pre-processing method was implemented:
+Image Pre-processing: Uploaded images are analyzed using OpenCV. If the text density confidence is low, the image is automatically rotated by 90 degrees to assist the OCR engine in recognizing vertical text.
+OCR and Filtering: The Google Cloud Vision API returns a raw stream of text. A regular expression (Regex) filter is applied to discard non-title text (e.g., publisher logos, volume numbers) and isolate potential book titles.
+3.2.3. Semantic Search Implementation
+The core recommendation logic implements the mathematical principles defined in Section 2.2.
+Instead of recalculating the cosine similarity for every book in the database (which would be computationally expensive), the system queries the pgvector index.
+The query execution plan utilizes the <=> (cosine distance) operator provided by the extension to efficiently retrieve the top-$k$ results that satisfy the maximization criteria of the Ranking Optimality theorem.
+3.2.4. RAG (Retrieval-Augmented Generation) Workflow
+The final stage employs a RAG architecture to provide context to the Large Language Model.
+Context Retrieval: The system retrieves the metadata of the selected top-5 books.
+Prompt Engineering: A dynamic prompt is constructed, injecting the User's Preference Profile and the selected Book's Metadata.
+Generation: The LLM is instructed to act as a "literary curator," explaining the connection between the user's known preferences (e.g., "dystopian themes") and the recommended book, resulting in a personalized output.
+3.3. Citations
+Example 3.3.1.
+Photo-based book recognition systems rely on optical character recognition and computer vision techniques to extract textual information from images, especially in scenarios involving book spines with varying orientations (Smith et al. 2019).
+Smith et al. (2019) demonstrated that cloud-based OCR services significantly improve text detection accuracy under low-quality image conditions compared to traditional OCR pipelines.
+Semantic recommendation systems based on dense vector embeddings have been shown to outperform keyword-based approaches in capturing latent user preferences (Mikolov et al. 2013; Reimers and Gurevych 2019).
+Retrieval-Augmented Generation architectures enable large language models to produce personalized and context-aware recommendations by integrating external knowledge sources (Lewis et al. 2020; Gao et al. 2023).
+3.3.2. Third level title
+3.4. Quotations
+Mikolov et al. (2013) explained the importance of distributed vector representations in capturing semantic relationships between textual elements:
+"Words with similar meanings tend to appear in similar contexts, and representing words as dense vectors allows semantic relationships to be captured through geometric proximity in a continuous vector space."
+Lewis et al. (2020) described the core idea behind retrieval-augmented generation systems, which is directly applied in the explanation generation module of BiblioMind:
+"Retrieval-augmented generation combines parametric knowledge stored in large language models with non-parametric knowledge retrieved from external sources, enabling more accurate and context-aware text generation."
+Gao et al. (2023) emphasized the role of retrieval-based architectures in improving personalization and factual grounding in modern AI systems:
+"By augmenting language models with retrieved contextual information, retrieval-augmented generation systems significantly enhance both the relevance and reliability of generated responses."
+4. RESULTS
+The development of the BiblioMind platform has progressed from the architectural design phase to the active implementation phase. During this interim period, the core infrastructure has been established, and the primary AI pipelines have been successfully prototyped. The key technical results achieved so far are summarized below:
+4.1. Infrastructure and Backend Implementation The microservices architecture has been successfully deployed using Docker containers. The FastAPI backend is fully operational, handling asynchronous requests for the application. A robust authentication system using JWT (JSON Web Tokens) has been implemented, securing the API endpoints for user registration and login. The Next.js frontend environment has been configured, and the basic authentication pages are functional.
+4.2. Database and Vector Search The PostgreSQL database schema has been finalized and deployed. The pgvector extension was successfully enabled to support high-dimensional vector operations.
+Data Ingestion: A dataset of approximately 10,000 books was cleaned and imported into the system.
+Embedding Generation: Using OpenAI's text-embedding-3-large model, semantic vector embeddings (1536 dimensions) were generated for all books in the dataset.
+Search Performance: Preliminary tests of the vector similarity search (using IVFFlat indexing) demonstrated that the system can retrieve semantically relevant books in under 200ms, validating the feasibility of the recommendation engine.
+4.3. Vision Pipeline Prototype The integration with Google Cloud Vision API has been established. A dedicated endpoint (/api/vision/analyze) was created to accept image uploads.
+OCR Results: Initial tests show that the system can successfully extract raw text from high-quality images of bookshelves.
+Challenges: As anticipated, the Optical Character Recognition (OCR) accuracy drops when book spines feature vertical text or low contrast. To mitigate this, the pre-processing module described in the methodology (image rotation and contrast enhancement) is currently being integrated.
+4.4. Recommendation Logic The "Vision-to-Recommendation" algorithm has been coded and unit-tested. The backend logic that takes a list of detected book titles, converts them to vectors, and calculates the Cosine Similarity against the user's preference profile is functional. The system is now capable of ranking books based on mathematical proximity to the user's interests, ready for the final frontend integration.
+5. CONCLUSIONS
+The interim development of the BiblioMind project has successfully demonstrated the feasibility of bridging the gap between physical book discovery and digital personalization through Artificial Intelligence. This study has moved beyond the conceptualization phase to establish a robust technical infrastructure, validating the core hypothesis: that visual inputs from the physical world can be effectively translated into semantic queries to drive personalized recommendations.
+Contributions to Basic and Applied Aspects
+From a theoretical perspective, this project contributes to the field of Information Retrieval (IR) and Recommender Systems by implementing a Vector Space Model (VSM) in a novel context. While traditional recommendation systems rely heavily on collaborative filtering (user-item interaction matrices), BiblioMind emphasizes content-based filtering enhanced by Deep Learning embeddings. By representing both the user's complex literary preferences and the semantic content of books as high-dimensional vectors in the same latent space, the system overcomes the "cold start" problem often found in collaborative systems. The project demonstrates that semantic similarity, calculated via cosine distance, offers a superior metric for determining relevance compared to keyword-based matching, especially when dealing with the nuanced themes of literature.
+On the applied engineering aspect, the project presents a scalable Microservices Architecture that orchestrates distinct AI domains—Computer Vision and Natural Language Processing (NLP)—into a cohesive workflow. The successful integration of Google Cloud Vision API for extracting text from unstructured images of bookshelves , followed by the immediate mapping of this text to a local PostgreSQL database extended with pgvector, serves as a practical blueprint for "Real-World-to-Digital" applications. Furthermore, the implementation of the Retrieval-Augmented Generation (RAG) pipeline contributes to the field of Human-Computer Interaction (HCI) by shifting the user interface from static lists to dynamic, empathic, and "human-like" explanations generated by Large Language Models (LLMs).
+Findings and Suggestions
+The experimental results obtained during the first two phases of development have yielded several critical findings that shape the future direction of the project:
+OCR Sensitivity and Pre-processing: The initial tests revealed that standard Optical Character Recognition (OCR) engines struggle with vertically oriented text, which is common on book spines. It was observed that the accuracy of text extraction drops significantly when the image is not aligned. Based on this finding, it is suggested and planned to implement a rigorous image pre-processing layer using OpenCV. This layer will perform automated 90-degree rotations and contrast enhancement before the image is sent to the Cloud Vision API, ensuring higher fidelity in text detection.
+Latency and Optimization: While vector similarity searches are computationally efficient (under 200ms), the round-trip latency for external API calls (Vision and OpenAI) creates a bottleneck. To address this applied constraint, it is suggested to implement aggressive caching strategies using Redis. Common search queries and previously analyzed images should be cached to reduce dependencies on external services and improve response times for the end-user.
+Semantic Nuance: The use of embeddings has proven successful in capturing genre and tone (e.g., "dystopian," "melancholic"). However, to further refine the "Empathic Recommendation Engine," the system requires a feedback loop. Future work should suggest incorporating an explicit user feedback mechanism (e.g., "Why did you like this recommendation?") to fine-tune the user preference vectors dynamically over time.
+In conclusion, the BiblioMind project has established a solid technical foundation. The remaining development phases will focus on optimizing the "Vision-to-Recommendation" pipeline, implementing the "Book Buddy" social layer, and finalizing the user interface. The study confirms that combining visual data processing with semantic AI offers a transformative approach to how users interact with physical book collections.
+6. REFERENCES 
+[1] Reimers, N., & Gurevych, I. (2019). "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks." *Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)*, 3982-3992.
+[2] Karpukhin, V., Oguz, B., Min, S., Lewis, P., Wu, L., Edunov, S., ... & Yih, W. T. (2020). "Dense Passage Retrieval for Open-Domain Question Answering." *Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)*, 6769-6781.
+[3] Chen, T., Guestrin, C., & He, X. (2016). "XGBoost: A Scalable Tree Boosting System." *Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*, 785-794.
+[4] Ricci, F., Rokach, L., & Shapira, B. (2015). "Recommender Systems Handbook" (2nd ed.). Springer.
+[5] Aggarwal, C. C. (2016). "Recommender Systems: The Textbook." Springer.
+[6] Rendle, S. (2012). "Factorization Machines with libFM." *ACM Transactions on Intelligent Systems and Technology (TIST)*, 3(3), 1-22.
+[7] He, X., Liao, L., Zhang, H., Nie, L., Hu, X., & Chua, T. S. (2017). "Neural Collaborative Filtering." *Proceedings of the 26th International Conference on World Wide Web*, 173-182.
+[8] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). "Attention is All You Need." *Advances in Neural Information Processing Systems*, 30.
+[9] Devlin, J., Chang, M. W., Lee, K., & Toutanova, K. (2019). "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding." *Proceedings of NAACL-HLT*, 4171-4186.
+[10] Brown, T., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P., ... & Amodei, D. (2020). "Language Models are Few-Shot Learners." *Advances in Neural Information Processing Systems*, 33, 1877-1901.
+[11] Ramachandran, P., Zoph, B., & Le, Q. V. (2017). "Searching for Activation Functions." *arXiv preprint arXiv:1710.05941*.
+[12] Google Cloud. (2023). "Cloud Vision API Documentation." Google Cloud Platform. Retrieved from https://cloud.google.com/vision/docs
+[13] OpenAI. (2023). "OpenAI API Documentation." OpenAI. Retrieved from https://platform.openai.com/docs
+[14] PostgreSQL Global Development Group. (2023). "PostgreSQL Documentation." PostgreSQL. Retrieved from https://www.postgresql.org/docs/
+[15] pgvector Development Team. (2023). "pgvector: Open-source vector similarity search for PostgreSQL." GitHub. Retrieved from https://github.com/pgvector/pgvector
+CURRICULUM VITAE
+Barış AYHAN was born on 20/09/1999 in Mersin. He/She completed his/her primary, secondary, and high school education in Mersin. In 2021, he/she enrolled in the Department of Computer Engineering at Akdeniz University.
+Kaan YILMAZ was born on 01/11/2002 in İstanbul. He/She completed his/her primary, secondary, and high school education in Istanbul. In 2020, he/she enrolled in the Department of Computer Engineering at Akdeniz University.
+Önder POLATDEMİR was born on 12/08/1999 in Bursa. He completed his  primary, secondary, and high school education in Bursa. In 2020, he enrolled in the Department of Computer Engineering at Akdeniz University.
+
+--- TABLES ---
+Table 0:
+Taner DANIŞMAN (Supervisor) | Date 02/01/2026 | Signature 
+ |  | 
+Kaan YILMAZ | Date 02/01/2026 | Signature 
+ |  | 
+Barış AYHAN | Date 02/01/2026 | Signature 
+ |  | 
+Önder POLATDEMİR | Date 02/01/2026 | Signature 
+
+Table 1:
+Rank (k) | Book Title | Similarity Score (sim) | Decision
+1 | The Dispossessed | 0.945 | Selected 
+2 | Dune | 0.892 | Selected 
+3 | Neuromancer | 0.810 | Selected 
+4 | Pride and Prejudice | 0.421 | Not Selected
+5 | The Great Gatsby | 0.385 | Not Selected
+
+Table 2:
+Table Name | Primary Key | Key Fields | Purpose
+Users | id (UUID) | email, password_hash, preferences_vector | User accounts and preferences
+Books | id (UUID) | title, author, isbn, embedding, price | Book catalog with embeddings
+User_interactions | id (UUID) | user_id, book_id, interaction_type | User behavior tracking
+Photo_scans | id (UUID) | user_id, image_url, detected_books | Photo analysis history
+Orders | id (UUID) | user_id, total_price, status | Order management
+Order_items | id (UUID) | order_id, book_id, quantity | Order line items
+

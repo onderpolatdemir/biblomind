@@ -29,6 +29,7 @@ export default function Header() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isSocialOpen, setIsSocialOpen] = useState(false);
     const [searchResults, setSearchResults] = useState<{ id: string; title: string }[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState<any[]>([]);
@@ -240,6 +241,45 @@ export default function Header() {
                         Social
                     </div>
                 </Link>
+                <div
+                    className="relative h-full flex items-center"
+                    onMouseEnter={() => setIsSocialOpen(true)}
+                    onMouseLeave={() => setIsSocialOpen(false)}
+                >
+                    <Link href="/book-buddies" className="hover:text-primary transition-colors py-4">
+                        <div className="flex items-center gap-1">
+                            <Users />
+                            Book Buddies
+                        </div>
+                    </Link>
+
+                    {/* BiblioMind Social Dropdown */}
+                    <AnimatePresence>
+                        {isSocialOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                transition={{ duration: 0.2 }}
+                                className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white shadow-xl border border-gray-100 rounded-2xl p-3 z-50"
+                            >
+                                <Link
+                                    href="/social"
+                                    className="block hover:opacity-80 transition-opacity"
+                                    onClick={() => setIsSocialOpen(false)}
+                                >
+                                    <Image
+                                        src="/biblomind_social.png"
+                                        alt="BiblioMind Social"
+                                        width={180}
+                                        height={60}
+                                        className="object-contain"
+                                    />
+                                </Link>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
                 <Link href="/recommendations" className="hover:text-primary transition-colors py-4">
                     <div className="flex items-center gap-1">
                         <Sparkles />

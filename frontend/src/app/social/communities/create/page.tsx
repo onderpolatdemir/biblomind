@@ -31,7 +31,10 @@ export default function CreateCommunityPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim()) { setError("Community name is required."); return; }
+        if (!name.trim()) {
+            setError("Community name is required.");
+            return;
+        }
         setIsSubmitting(true);
         setError("");
         try {
@@ -65,11 +68,9 @@ export default function CreateCommunityPage() {
                 <h1 className="text-3xl font-heading font-bold text-gray-900 mb-8">Create Community</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Photos */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                         <h2 className="font-bold text-gray-700">Visuals</h2>
                         <div className="flex gap-4">
-                            {/* Profile photo */}
                             <div>
                                 <label className="text-xs font-medium text-gray-500 block mb-1">Profile Photo</label>
                                 <label className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 hover:border-primary flex items-center justify-center cursor-pointer overflow-hidden transition-colors">
@@ -84,12 +85,15 @@ export default function CreateCommunityPage() {
                                         className="hidden"
                                         onChange={(e) => {
                                             const f = e.target.files?.[0];
-                                            if (f) { setProfilePhoto(f); setProfilePreview(URL.createObjectURL(f)); }
+                                            if (f) {
+                                                setProfilePhoto(f);
+                                                setProfilePreview(URL.createObjectURL(f));
+                                            }
                                         }}
                                     />
                                 </label>
                             </div>
-                            {/* Banner */}
+
                             <div className="flex-1">
                                 <label className="text-xs font-medium text-gray-500 block mb-1">Banner Image</label>
                                 <label className="w-full h-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-primary flex items-center justify-center cursor-pointer overflow-hidden transition-colors">
@@ -104,7 +108,10 @@ export default function CreateCommunityPage() {
                                         className="hidden"
                                         onChange={(e) => {
                                             const f = e.target.files?.[0];
-                                            if (f) { setBannerPhoto(f); setBannerPreview(URL.createObjectURL(f)); }
+                                            if (f) {
+                                                setBannerPhoto(f);
+                                                setBannerPreview(URL.createObjectURL(f));
+                                            }
                                         }}
                                     />
                                 </label>
@@ -112,9 +119,9 @@ export default function CreateCommunityPage() {
                         </div>
                     </div>
 
-                    {/* Basic Info */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                         <h2 className="font-bold text-gray-700">Basic Info</h2>
+
                         <div>
                             <label className="text-xs font-medium text-gray-500 block mb-1">Community Name *</label>
                             <input
@@ -125,6 +132,7 @@ export default function CreateCommunityPage() {
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none text-sm transition-all"
                             />
                         </div>
+
                         <div>
                             <label className="text-xs font-medium text-gray-500 block mb-1">Description</label>
                             <textarea
@@ -135,6 +143,7 @@ export default function CreateCommunityPage() {
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none text-sm transition-all resize-none"
                             />
                         </div>
+
                         <div>
                             <label className="text-xs font-medium text-gray-500 block mb-2">Privacy</label>
                             <div className="flex gap-3">
@@ -143,7 +152,11 @@ export default function CreateCommunityPage() {
                                         key={p}
                                         type="button"
                                         onClick={() => setPrivacy(p)}
-                                        className={`px-5 py-2 rounded-xl text-sm font-bold capitalize border-2 transition-all ${privacy === p ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-500"}`}
+                                        className={`px-5 py-2 rounded-xl text-sm font-bold capitalize border-2 transition-all ${
+                                            privacy === p
+                                                ? "border-primary bg-primary/5 text-primary"
+                                                : "border-gray-200 text-gray-500"
+                                        }`}
                                     >
                                         {p}
                                     </button>
@@ -152,12 +165,15 @@ export default function CreateCommunityPage() {
                         </div>
                     </div>
 
-                    {/* Tags */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <h2 className="font-bold text-gray-700 mb-3">Category Tags</h2>
+
                         <div className="flex gap-2 flex-wrap mb-3">
                             {tags.map((t) => (
-                                <span key={t} className="flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
+                                <span
+                                    key={t}
+                                    className="flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full"
+                                >
                                     {t}
                                     <button type="button" onClick={() => setTags((prev) => prev.filter((x) => x !== t))}>
                                         <X size={10} />
@@ -165,22 +181,31 @@ export default function CreateCommunityPage() {
                                 </span>
                             ))}
                         </div>
+
                         <div className="flex gap-2">
                             <input
                                 type="text"
                                 value={tagInput}
                                 onChange={(e) => setTagInput(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addTag();
+                                    }
+                                }}
                                 placeholder="Add a tag..."
                                 className="flex-1 px-4 py-2 rounded-xl border border-gray-200 focus:border-primary outline-none text-sm transition-all"
                             />
-                            <button type="button" onClick={addTag} className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-opacity-90">
+                            <button
+                                type="button"
+                                onClick={addTag}
+                                className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-opacity-90"
+                            >
                                 Add
                             </button>
                         </div>
                     </div>
 
-                    {/* Rules */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="font-bold text-gray-700">Community Rules</h2>
@@ -192,6 +217,7 @@ export default function CreateCommunityPage() {
                                 <Plus size={12} /> Add Rule
                             </button>
                         </div>
+
                         <div className="space-y-2">
                             {rules.map((rule, i) => (
                                 <div key={i} className="flex gap-2">
@@ -199,12 +225,18 @@ export default function CreateCommunityPage() {
                                     <input
                                         type="text"
                                         value={rule}
-                                        onChange={(e) => setRules((prev) => prev.map((r, j) => j === i ? e.target.value : r))}
+                                        onChange={(e) =>
+                                            setRules((prev) => prev.map((r, j) => (j === i ? e.target.value : r)))
+                                        }
                                         placeholder="Describe this rule..."
                                         className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:border-primary outline-none text-sm transition-all"
                                     />
                                     {rules.length > 1 && (
-                                        <button type="button" onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400">
+                                        <button
+                                            type="button"
+                                            onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
+                                            className="text-gray-300 hover:text-red-400"
+                                        >
                                             <X size={16} />
                                         </button>
                                     )}
