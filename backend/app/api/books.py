@@ -68,14 +68,16 @@ async def search_books(
     genre: Optional[str] = Query(None, description="Filter by genre"),
     author: Optional[str] = Query(None, description="Filter by author"),
     min_price: Optional[float] = Query(None, ge=0, description="Minimum price"),
-    max_price: Optional[float] = Query(None, ge=0, description="Maximum price")
+    max_price: Optional[float] = Query(None, ge=0, description="Maximum price"),
+    db: Session = Depends(get_db)
 ):
     """
     Search books with Elasticsearch (public endpoint).
+    Falls back to PostgreSQL ILIKE search if Elasticsearch is unavailable.
     
     Features:
     - Full-text search across title, author, description
-    - Fuzzy matching (typo tolerance)
+    - Fuzzy matching (typo tolerance) when using Elasticsearch
     - Relevance scoring
     - Combine with filters (genre, author, price range)
     
@@ -84,29 +86,76 @@ async def search_books(
     - /api/books/search?q=Orwel (finds "Orwell")
     - /api/books/search?q=dystopian&genre=Science Fiction
     """
-    # Check Elasticsearch connection
-    if not es_service.ping():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Search service temporarily unavailable"
+    # Try Elasticsearch first
+    try:
+        if es_service.ping():
+            results = es_service.search_books(
+                query=q,
+                page=page,
+                page_size=page_size,
+                genre=genre,
+                author=author,
+                min_price=min_price,
+                max_price=max_price
+            )
+            
+            total = results["total"]
+            if total > 0 or results.get("hits"):
+                total_pages = math.ceil(total / page_size) if total > 0 else 0
+                return BookSearchResponse(
+                    items=results["hits"],
+                    total=total,
+                    page=page,
+                    page_size=page_size,
+                    total_pages=total_pages
+                )
+    except Exception:
+        pass  # Fall through to PostgreSQL fallback
+
+    # ── PostgreSQL fallback ────────────────────────────────────────────────
+    from app.models.book import Book
+    from sqlalchemy import or_, func, cast, String
+
+    search_term = f"%{q}%"
+    query = db.query(Book).filter(
+        or_(
+            Book.title.ilike(search_term),
+            Book.author.ilike(search_term),
+            Book.description.ilike(search_term),
         )
-    
-    # Perform search
-    results = es_service.search_books(
-        query=q,
-        page=page,
-        page_size=page_size,
-        genre=genre,
-        author=author,
-        min_price=min_price,
-        max_price=max_price
     )
-    
-    total = results["total"]
+
+    # Apply filters
+    if genre:
+        query = query.filter(Book.genres.any(genre))
+    if author:
+        query = query.filter(Book.author.ilike(f"%{author}%"))
+    if min_price is not None:
+        query = query.filter(Book.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Book.price <= max_price)
+
+    total = query.count()
     total_pages = math.ceil(total / page_size) if total > 0 else 0
-    
+    offset = (page - 1) * page_size
+    books = query.order_by(Book.title).offset(offset).limit(page_size).all()
+
+    items = [
+        {
+            "id": str(b.id),
+            "title": b.title,
+            "author": b.author,
+            "price": float(b.price) if b.price else 0,
+            "cover_url": b.cover_url,
+            "genres": b.genres or [],
+            "rating": 4.0,
+            "_score": 1.0,
+        }
+        for b in books
+    ]
+
     return BookSearchResponse(
-        items=results["hits"],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,

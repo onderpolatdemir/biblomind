@@ -48,6 +48,7 @@ export default function BookBuddiesPage() {
     const [buddies, setBuddies] = useState<BuddyMatch[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
+    const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
     const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
     const [blockConfirmId, setBlockConfirmId] = useState<string | null>(null);
     const [selectedBuddy, setSelectedBuddy] = useState<BuddyMatch | null>(null);
@@ -97,10 +98,15 @@ export default function BookBuddiesPage() {
 
     const connectBuddy = async (userId: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (pendingIds.has(userId) || connectedIds.has(userId)) return;
         try {
-            await api.post(`/social/connect/${userId}`);
+            const res = await api.post(`/social/connect/${userId}`);
+            if (res.data?.status === "connected") {
+                setConnectedIds((prev) => new Set(prev).add(userId));
+            } else {
+                setPendingIds((prev) => new Set(prev).add(userId));
+            }
         } catch { /* may already be connected */ }
-        setConnectedIds((prev) => new Set(prev).add(userId));
     };
 
     const searchUsers = async (q: string) => {
@@ -334,13 +340,18 @@ export default function BookBuddiesPage() {
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={(e) => connectBuddy(buddy.user_id, e)}
+                                        disabled={pendingIds.has(buddy.user_id)}
                                         className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all ${connectedIds.has(buddy.user_id)
                                             ? "bg-green-100 text-green-700"
-                                            : "bg-text text-white hover:bg-accent"
+                                            : pendingIds.has(buddy.user_id)
+                                              ? "bg-yellow-100 text-yellow-700 cursor-default"
+                                              : "bg-text text-white hover:bg-accent"
                                             }`}
                                     >
                                         {connectedIds.has(buddy.user_id) ? (
                                             <><CheckCircle size={12} /> Connected</>
+                                        ) : pendingIds.has(buddy.user_id) ? (
+                                            <><CheckCircle size={12} /> Request Sent</>
                                         ) : (
                                             <><UserPlus size={12} /> Connect</>
                                         )}
@@ -495,23 +506,24 @@ export default function BookBuddiesPage() {
                                         {/* Mutual Books */}
                                         {(sharedInterests?.mutual_books?.length ?? 0) > 0 && (
                                             <div>
-                                                <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide">Books You Both Love</h3>
+                                                <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide flex items-center gap-2">Books You Both Love <span className="text-amber-500">&#9733;</span></h3>
                                                 <div className="space-y-2">
                                                     {sharedInterests?.mutual_books?.map((b) => (
-                                                        <div key={b.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
+                                                        <div key={b.id} className="flex items-center gap-3 rounded-xl px-3 py-2 bg-amber-50 border border-amber-200 ring-1 ring-amber-100 shadow-sm">
                                                             <div className="relative w-8 h-12 rounded overflow-hidden bg-secondary flex-shrink-0">
                                                                 {b.cover_url ? (
                                                                     <Image src={b.cover_url} alt={b.title} fill className="object-cover" />
                                                                 ) : (
                                                                     <div className="flex items-center justify-center h-full">
-                                                                        <BookOpen size={14} className="text-gray-400" />
+                                                                        <BookOpen size={14} className="text-amber-500" />
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            <div>
-                                                                <p className="font-medium text-sm text-gray-800 line-clamp-1">{b.title}</p>
+                                                            <div className="flex-1">
+                                                                <p className="font-semibold text-sm text-gray-800 line-clamp-1">{b.title}</p>
                                                                 <p className="text-xs text-gray-500">{b.author}</p>
                                                             </div>
+                                                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0">Mutual</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -556,12 +568,15 @@ export default function BookBuddiesPage() {
                             <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3">
                                 <button
                                     onClick={(e) => connectBuddy(selectedBuddy.user_id, e)}
+                                    disabled={pendingIds.has(selectedBuddy.user_id)}
                                     className={`flex-1 py-3 rounded-full font-bold text-sm transition-all ${connectedIds.has(selectedBuddy.user_id)
                                         ? "bg-green-100 text-green-700"
-                                        : "bg-text text-white hover:bg-accent"
+                                        : pendingIds.has(selectedBuddy.user_id)
+                                          ? "bg-yellow-100 text-yellow-700 cursor-default"
+                                          : "bg-text text-white hover:bg-accent"
                                         }`}
                                 >
-                                    {connectedIds.has(selectedBuddy.user_id) ? "Connected!" : `Connect with ${selectedBuddy.full_name?.split(" ")[0]}`}
+                                    {connectedIds.has(selectedBuddy.user_id) ? "Connected!" : pendingIds.has(selectedBuddy.user_id) ? "Request Sent" : `Connect with ${selectedBuddy.full_name?.split(" ")[0]}`}
                                 </button>
                                 <button
                                     onClick={() => setBlockConfirmId(selectedBuddy.user_id)}
