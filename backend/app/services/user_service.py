@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections import Counter
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -84,18 +85,24 @@ class UserService:
         favorite_books = UserService.get_user_favorites(db, user_id)
         
         # Extract genres and authors from favorite books
-        genres = set()
+        genre_counter: Counter = Counter()
         authors = set()
         
         for book in favorite_books:
             if book.genres:
-                genres.update(book.genres)
+                genre_counter.update(book.genres)
             if book.author:
                 authors.add(book.author)
-        
+
+        # Normalize genre counts to [0.0, 1.0] so most-frequent genre = 1.0
+        max_count = max(genre_counter.values(), default=1)
+        genre_weights = {g: round(c / max_count, 4) for g, c in genre_counter.items()}
+
         return {
-            "favorite_genres": sorted(list(genres)),
-            "favorite_authors": sorted(list(authors))
+            # Sorted by frequency descending so callers can use[:N] for top genres
+            "favorite_genres": [g for g, _ in genre_counter.most_common()],
+            "favorite_authors": sorted(list(authors)),
+            "genre_weights": genre_weights,
         }
     
     @staticmethod

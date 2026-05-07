@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_admin_user
+from app.api.deps import get_db, get_current_admin_user, get_current_user_optional
+from app.models.user import User
 from app.services.book_service import BookService
 from app.services.elasticsearch_service import es_service
 from app.schemas.book import BookCreate, BookUpdate, BookResponse, BookListResponse, BookSearchResponse
@@ -26,7 +27,8 @@ async def get_books(
     max_price: Optional[float] = Query(None, ge=0, description="Maximum price"),
     sort_by: str = Query("created_at", pattern="^(title|author|price|created_at)$", description="Sort field"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get paginated list of books (public endpoint).
@@ -36,6 +38,9 @@ async def get_books(
     - Filtering (genre, author, price range)
     - Sorting (title, author, price, created_at)
     """
+    # Randomize order for users without a preference vector (new/unauthenticated users)
+    randomize = current_user is None or current_user.preferences_vector is None
+
     books, total = BookService.get_books(
         db=db,
         page=page,
@@ -46,7 +51,8 @@ async def get_books(
         min_price=min_price,
         max_price=max_price,
         sort_by=sort_by,
-        sort_order=sort_order
+        sort_order=sort_order,
+        randomize=randomize
     )
     
     total_pages = math.ceil(total / page_size) if total > 0 else 0

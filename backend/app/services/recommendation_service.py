@@ -323,7 +323,7 @@ class RecommendationService:
             if not user:
                 raise ValueError(f"User {user_id} not found")
             
-            # Get user's interactions with books that have embeddings
+            # Get user's meaningful interactions (exclude view — too passive)
             interactions = self.db.query(
                 UserInteraction, Book
             ).join(
@@ -331,6 +331,7 @@ class RecommendationService:
             ).filter(
                 and_(
                     UserInteraction.user_id == user_id,
+                    UserInteraction.interaction_type.in_(['like', 'cart', 'purchase']),
                     Book.embedding.isnot(None)
                 )
             ).all()
@@ -423,6 +424,10 @@ class RecommendationService:
         except Exception as e:
             logger.warning(f"Could not load user_prefs for user {user.id}: {e}")
 
+        # Get genre weights from sync prefs (Counter-based, not LLM-based)
+        sync_prefs = UserService.get_user_preferences(self.db, user.id)
+        genre_weights = sync_prefs.get('genre_weights', {})
+
         # Format results
         recommendations = []
         for book, distance in results:
@@ -438,10 +443,17 @@ class RecommendationService:
                     content_score += 0.4  # Massive boost for favorite author
                     is_fav_author = True
                     
-                if book.genres:
-                    matching_genres = [g for g in book.genres if g in fav_genres]
-                    if matching_genres:
-                        content_score += 0.15  # Moderate boost for favorite genre
+                if book.genres and genre_weights:
+                    # Dynamic boost: max 0.15 for most-liked genre, proportionally less for others
+                    genre_boost = max(
+                        (genre_weights.get(g, 0.0) * 0.15 for g in book.genres),
+                        default=0.0
+                    )
+                    content_score += genre_boost
+                elif book.genres and fav_genres:
+                    # Fallback: no weight data, use flat boost if any genre matches
+                    if any(g in fav_genres for g in book.genres):
+                        content_score += 0.05
 
             content_score = min(1.0, content_score)
             
@@ -510,14 +522,21 @@ class RecommendationService:
             if user_prefs:
                 fav_authors = user_prefs.get('favorite_authors', [])
                 fav_genres = user_prefs.get('favorite_genres', [])
-                
+                genre_weights = user_prefs.get('genre_weights', {})
+
                 if book.author and book.author in fav_authors:
                     content_score += 0.4  # Huge boost
                     is_fav_author = True
                 if book.genres:
-                    matching_genres = [g for g in book.genres if g in fav_genres]
-                    if matching_genres:
-                        content_score += 0.15  # Moderate boost
+                    if genre_weights:
+                        # Dynamic boost: max 0.15 for most-liked genre
+                        genre_boost = max(
+                            (genre_weights.get(g, 0.0) * 0.15 for g in book.genres),
+                            default=0.0
+                        )
+                        content_score += genre_boost
+                    elif any(g in fav_genres for g in book.genres):
+                        content_score += 0.05  # Fallback flat boost
             
             content_score = min(1.0, content_score)
             
@@ -627,15 +646,19 @@ class RecommendationService:
                 ).filter(Book.stock > 0, Book.author.in_(fav_authors))
                 _add_to_candidates(q_authors, boost_score=100)
                 
-            # 2. Fetch by favorite genres
+            # 2. Fetch by favorite genres — boost proportional to genre frequency
             fav_genres = user_prefs.get('favorite_genres', []) if user_prefs else []
+            genre_weights = user_prefs.get('genre_weights', {}) if user_prefs else {}
             if fav_genres:
-                for g in fav_genres[:2]:
-                    from sqlalchemy import cast, String
+                from sqlalchemy import cast, String
+                # Use top 3 genres; boost scales with weight (top genre → 50, others proportionally less)
+                for g in fav_genres[:3]:
+                    weight = genre_weights.get(g, 1.0) if genre_weights else 1.0
+                    boost = max(10, int(50 * weight))
                     q_genres = self.db.query(Book, func.count(UserInteraction.id).label('ic')).outerjoin(
                         UserInteraction, Book.id == UserInteraction.book_id
                     ).filter(Book.stock > 0, cast(Book.genres, String).ilike(f'%{g}%'))
-                    _add_to_candidates(q_genres, boost_score=50)
+                    _add_to_candidates(q_genres, boost_score=boost)
 
             # 3. Fetch globally popular books
             q_popular = self.db.query(Book, func.count(UserInteraction.id).label('ic')).outerjoin(
@@ -684,6 +707,7 @@ class RecommendationService:
                     "explanation": explanation
                 })
             
+            recommendations.sort(key=lambda x: x["score"], reverse=True)
             return recommendations
         except Exception as e:
             return [{
