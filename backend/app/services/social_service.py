@@ -68,7 +68,7 @@ class SocialService:
         user_id: UUID,
         limit: int = 10,
         min_interactions: int = 1,
-        min_similarity: float = 0.3
+        min_similarity: float = 0.6
     ) -> List[Dict[str, Any]]:
         """
         Find users with similar reading preferences (Book Buddies).
@@ -83,15 +83,15 @@ class SocialService:
                 logger.warning(f"User {user_id} has no preference vector")
                 return []
 
-            # Exclude users already blocked in either direction
-            blocked_ids = {
+            # Exclude users already blocked, connected, or pending
+            excluded_ids = {
                 c.buddy_id if c.user_id == user_id else c.user_id
                 for c in self.db.query(UserConnection).filter(
                     or_(
                         UserConnection.user_id == user_id,
                         UserConnection.buddy_id == user_id
                     ),
-                    UserConnection.status == "blocked"
+                    UserConnection.status.in_(["blocked", "connected", "pending"])
                 ).all()
             }
 
@@ -100,7 +100,7 @@ class SocialService:
                 .filter(
                     User.id != user_id,
                     User.preferences_vector.isnot(None),
-                    ~User.id.in_(blocked_ids) if blocked_ids else True
+                    ~User.id.in_(excluded_ids) if excluded_ids else True
                 )
                 .all()
             )
@@ -708,3 +708,80 @@ class SocialService:
             ))
         except Exception:
             pass
+
+    def get_buddy_community_recommendations(
+        self,
+        user_id: UUID,
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Get community recommendations based on active connections (Book Buddies).
+        Suggests communities that the user's buddies belong to, 
+        excluding communities the user is already a member of.
+        """
+        try:
+            from app.models.community import Community, CommunityMember
+            
+            # 1. Find active connections (buddies)
+            connections = (
+                self.db.query(UserConnection)
+                .filter(
+                    or_(
+                        UserConnection.user_id == user_id,
+                        UserConnection.buddy_id == user_id,
+                    ),
+                    UserConnection.status == "connected"
+                )
+                .all()
+            )
+            
+            buddy_ids = []
+            for c in connections:
+                if c.user_id == user_id:
+                    buddy_ids.append(c.buddy_id)
+                else:
+                    buddy_ids.append(c.user_id)
+                    
+            if not buddy_ids:
+                return []
+                
+            # 2. Get communities the user is already in
+            my_community_ids = {
+                cm.community_id for cm in 
+                self.db.query(CommunityMember.community_id)
+                .filter(CommunityMember.user_id == user_id)
+                .all()
+            }
+            
+            # 3. Get communities that buddies are in, but the user is not
+            buddy_memberships = (
+                self.db.query(CommunityMember, Community, User)
+                .join(Community, CommunityMember.community_id == Community.id)
+                .join(User, CommunityMember.user_id == User.id)
+                .filter(
+                    CommunityMember.user_id.in_(buddy_ids),
+                    ~CommunityMember.community_id.in_(my_community_ids) if my_community_ids else True
+                )
+                .all()
+            )
+            
+            # Group by community
+            community_map = {}
+            for member, community, buddy_user in buddy_memberships:
+                if community.id not in community_map:
+                    buddy_name = buddy_user.full_name or buddy_user.username or "A buddy"
+                    community_map[community.id] = {
+                        "community_id": community.id,
+                        "community_name": community.name,
+                        "community_avatar_url": community.profile_photo_url,
+                        "buddy_name": buddy_name
+                    }
+                    
+            recommendations = list(community_map.values())
+            
+            # Simple limiting logic, could be ranked better in the future
+            return recommendations[:limit]
+            
+        except Exception as e:
+            logger.error(f"Error fetching buddy community recommendations for {user_id}: {e}")
+            return []

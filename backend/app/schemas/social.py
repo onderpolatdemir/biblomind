@@ -130,3 +130,19 @@ class BlockResponse(BaseModel):
     blocked_user_id: UUID4
     status: str
     message: str
+
+
+class BuddyCommunityRecommendation(BaseModel):
+    """Community recommended because a buddy is a member."""
+    community_id: UUID4
+    community_name: str
+    community_avatar_url: Optional[str] = None
+    buddy_name: str
+    
+    model_config = {"from_attributes": True}
+
+
+class BuddyCommunityRecommendationsResponse(BaseModel):
+    """List of community recommendations from buddies."""
+    recommendations: List[BuddyCommunityRecommendation]
+    total: int

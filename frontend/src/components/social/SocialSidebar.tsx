@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users, Plus } from "lucide-react";
+import { Users, Plus, Sparkles } from "lucide-react";
 import api from "@/lib/api";
 
 const BACKEND_URL = "http://localhost:8000";
@@ -14,15 +14,26 @@ interface MyCommunity {
     member_count: number;
 }
 
+interface BuddyRecommendation {
+    community_id: string;
+    community_name: string;
+    community_avatar_url: string | null;
+    buddy_name: string;
+}
+
 export default function SocialSidebar() {
     const [communities, setCommunities] = useState<MyCommunity[]>([]);
+    const [recommendations, setRecommendations] = useState<BuddyRecommendation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/communities/my")
-            .then((r) => setCommunities(r.data.communities ?? []))
-            .catch(() => setCommunities([]))
-            .finally(() => setIsLoading(false));
+        Promise.all([
+            api.get("/communities/my").catch(() => ({ data: { communities: [] } })),
+            api.get("/social/community-recommendations").catch(() => ({ data: { recommendations: [] } }))
+        ]).then(([commRes, recRes]) => {
+            setCommunities(commRes.data.communities ?? []);
+            setRecommendations(recRes.data.recommendations ?? []);
+        }).finally(() => setIsLoading(false));
     }, []);
 
     return (
@@ -92,6 +103,45 @@ export default function SocialSidebar() {
                         >
                             Explore more →
                         </Link>
+                    </div>
+                )}
+
+                {!isLoading && recommendations.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-100">
+                        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 mb-4">
+                            <Sparkles size={16} className="text-primary" /> Recommended for You
+                        </h3>
+                        <div className="space-y-1">
+                            {recommendations.map((r) => {
+                                const avatarSrc = r.community_avatar_url
+                                    ? r.community_avatar_url.startsWith("http")
+                                        ? r.community_avatar_url
+                                        : `${BACKEND_URL}${r.community_avatar_url}`
+                                    : null;
+
+                                return (
+                                    <Link
+                                        key={r.community_id}
+                                        href={`/social/communities/${r.community_id}`}
+                                        className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors group"
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                                            {avatarSrc ? (
+                                                <img src={avatarSrc} alt={r.community_name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                r.community_name.charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-gray-700 truncate group-hover:text-primary transition-colors">
+                                                {r.community_name}
+                                            </p>
+                                            <p className="text-[10px] text-gray-400 truncate">Because {r.buddy_name} is a member</p>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </div>
