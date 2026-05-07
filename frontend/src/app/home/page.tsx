@@ -328,6 +328,27 @@ export default function HomePage() {
                                 </div>
                             )}
 
+                            {/* No recommendations notice */}
+                            {shelfResult.detected_books?.length > 0 && !(shelfResult.recommendations?.length > 0) && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-secondary/20 border border-secondary/40 rounded-2xl px-6 py-5 flex items-start gap-4"
+                                >
+                                    <span className="text-2xl mt-0.5">🔍</span>
+                                    <div>
+                                        <p className="font-bold text-text text-base mb-1">
+                                            We couldn't find any recommendations for you yet.
+                                        </p>
+                                        <p className="text-sm text-gray-500 leading-relaxed">
+                                            To personalize your shelf matches, we need to learn your reading taste first. Try adding books to your{" "}
+                                            <a href="/favorites" className="text-accent font-semibold hover:underline">favorites</a>,
+                                            rating a few books, or placing an order — then come back and scan your shelf again!
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            )}
+
                             {/* Recommendations from shelf */}
                             {shelfResult.recommendations?.length > 0 && (
                                 <div>

@@ -13,6 +13,9 @@ from app.models.user import User
 # OAuth2 scheme - Swagger UI'da email/password popup için
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+# Optional OAuth2 scheme - returns None instead of 401 when no token provided
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
 
 def get_db() -> Generator:
     """
@@ -79,7 +82,7 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    token: Optional[str] = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
     """

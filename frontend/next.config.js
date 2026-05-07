@@ -2,6 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    unoptimized: true,
+    minimumCacheTTL: 60 * 60 * 24 * 7,
     domains: ['localhost'],
     remotePatterns: [
       {

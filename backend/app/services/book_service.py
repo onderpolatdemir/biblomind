@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, case
 from uuid import UUID
 import math
 import logging
@@ -27,7 +27,8 @@ class BookService:
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
         sort_by: str = "created_at",
-        sort_order: str = "desc"
+        sort_order: str = "desc",
+        randomize: bool = False
     ) -> tuple[List[Book], int]:
         """
         Get paginated and filtered list of books.
@@ -76,11 +77,29 @@ class BookService:
         total = query.count()
         
         # Apply sorting
-        sort_column = getattr(Book, sort_by, Book.created_at)
-        if sort_order == "asc":
-            query = query.order_by(sort_column.asc())
+        if randomize:
+            if genre:
+                # Primary genre match books first, then random within each group
+                primary_genre_priority = case(
+                    (func.lower(Book.genres[1]) == genre.lower(), 0),
+                    else_=1
+                )
+                query = query.order_by(primary_genre_priority, func.random())
+            else:
+                query = query.order_by(func.random())
         else:
-            query = query.order_by(sort_column.desc())
+            sort_column = getattr(Book, sort_by, Book.created_at)
+            sort_expr = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+
+            if genre:
+                # Books where the genre is first in the genres array come first
+                primary_genre_priority = case(
+                    (func.lower(Book.genres[1]) == genre.lower(), 0),
+                    else_=1
+                )
+                query = query.order_by(primary_genre_priority, sort_expr)
+            else:
+                query = query.order_by(sort_expr)
             
         # Eager load reviews
         query = query.options(selectinload(Book.reviews))
