@@ -100,6 +100,16 @@ export default function Header() {
         await dismissNotification(n);
     };
 
+    const handleBuddyRequestAccept = async (n: any) => {
+        try { await api.post(`/social/connections/${n.entity_id}/accept`); } catch {}
+        await dismissNotification(n);
+    };
+
+    const handleBuddyRequestReject = async (n: any) => {
+        try { await api.post(`/social/connections/${n.entity_id}/reject`); } catch {}
+        await dismissNotification(n);
+    };
+
     const handleSearchChange = useCallback(async (query: string) => {
         if (query.length < 3) {
             setSearchResults([]);
@@ -383,6 +393,21 @@ export default function Header() {
                                                                             Profile
                                                                         </Link>
                                                                     )}
+                                                                </div>
+                                                            ) : n.type === "buddy_request" ? (
+                                                                <div className="flex gap-1.5 mt-2">
+                                                                    <button
+                                                                        onClick={() => handleBuddyRequestAccept(n)}
+                                                                        className="px-2.5 py-1 bg-green-500 text-white text-[10px] rounded-lg font-bold hover:bg-green-600 transition-colors"
+                                                                    >
+                                                                        Accept
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleBuddyRequestReject(n)}
+                                                                        className="px-2.5 py-1 bg-red-500 text-white text-[10px] rounded-lg font-bold hover:bg-red-600 transition-colors"
+                                                                    >
+                                                                        Reject
+                                                                    </button>
                                                                 </div>
                                                             ) : (
                                                                 <p className="text-[10px] text-gray-400 mt-1">

@@ -234,10 +234,18 @@ async def upsert_review_v2(
     """
     Create or update the current user's review for a book.
     Each user can only have one review per book (upsert).
+    User must have purchased the book to review it.
     """
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Verify user has purchased the book
+    if not ReviewService.check_user_bought_book(db, current_user.id, book_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only review books you have purchased"
+        )
 
     existing = db.query(Review).filter(
         Review.user_id == current_user.id,

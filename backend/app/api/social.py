@@ -338,3 +338,64 @@ async def block_user(
         status="blocked",
         message=f"User has been blocked successfully",
     )
+
+
+@router.post("/connections/{connection_id}/accept", response_model=ConnectionResponse)
+async def accept_connection(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Accept a pending connection request.
+
+    Only the recipient (buddy_id on the connection) can accept.
+    Creates a mutual connection and notifies the requester.
+    """
+    service = SocialService(db)
+    connection = service.accept_connection(current_user.id, connection_id)
+
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connection request not found or you cannot accept it"
+        )
+
+    logger.info(f"User {current_user.id} accepted connection {connection_id}")
+
+    return ConnectionResponse(
+        connection_id=connection.id,
+        user_id=connection.user_id,
+        buddy_id=connection.buddy_id,
+        compatibility_score=connection.compatibility_score,
+        shared_books=connection.shared_books,
+        shared_genres=connection.shared_genres,
+        status=connection.status,
+        created_at=connection.created_at
+    )
+
+
+@router.post("/connections/{connection_id}/reject")
+async def reject_connection(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a pending connection request.
+
+    Only the recipient (buddy_id on the connection) can reject.
+    Deletes the connection row entirely.
+    """
+    service = SocialService(db)
+    success = service.reject_connection(current_user.id, connection_id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connection request not found or you cannot reject it"
+        )
+
+    logger.info(f"User {current_user.id} rejected connection {connection_id}")
+    return {"ok": True, "message": "Connection request rejected"}
+

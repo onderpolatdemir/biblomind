@@ -4,9 +4,9 @@ import os
 import logging
 import asyncio
 import json
+import base64
+import httpx
 from typing import List, Dict, Any, Tuple, Optional
-from google.cloud import vision
-from google.api_core import exceptions as google_exceptions
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -22,24 +22,31 @@ from app.utils.fuzzy_matcher import (
 
 logger = logging.getLogger(__name__)
 
+VISION_REST_URL = "https://vision.googleapis.com/v1/images:annotate"
+
 
 class VisionService:
     """Google Cloud Vision API integration for book detection."""
-    
+
     def __init__(self):
-        """Initialize Vision API client."""
-        # Set credentials path from config
-        if settings.GOOGLE_APPLICATION_CREDENTIALS:
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = settings.GOOGLE_APPLICATION_CREDENTIALS
-        
-        # Initialize client
-        try:
-            self.client = vision.ImageAnnotatorClient()
-            logger.info("Google Cloud Vision client initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize Vision client: {e}")
-            raise
-    
+        """Initialize Vision API client (API key mode or service account mode)."""
+        self.api_key = settings.GOOGLE_VISION_API_KEY
+        self.client = None  # SDK client (only used in service-account mode)
+
+        if self.api_key:
+            logger.info("Google Cloud Vision configured with API key (REST mode)")
+        else:
+            # Fallback: try service account credentials
+            if settings.GOOGLE_APPLICATION_CREDENTIALS:
+                os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = settings.GOOGLE_APPLICATION_CREDENTIALS
+            try:
+                from google.cloud import vision
+                self.client = vision.ImageAnnotatorClient()
+                logger.info("Google Cloud Vision client initialized (service account mode)")
+            except Exception as e:
+                logger.error(f"Failed to initialize Vision client: {e}")
+                raise
+
     async def detect_text_from_image(
         self,
         image_bytes: bytes,
@@ -48,39 +55,38 @@ class VisionService:
     ) -> List[str]:
         """
         Detect text from image using OCR with 4-direction rotation.
-        
+
         Args:
             image_bytes: Image file bytes
             min_confidence: Minimum confidence threshold (default: from config)
-            
+
         Returns:
             List of detected text strings (unique, cleaned)
-            
+
         Raises:
             ValueError: If image is invalid
-            google_exceptions.GoogleAPIError: If Vision API fails
         """
         # Validate image
         validate_image(image_bytes, max_size_mb=settings.MAX_UPLOAD_SIZE_MB)
-        
+
         # Resize if too large
         image_bytes = resize_if_large(image_bytes, max_dimension=4096)
-        
+
         # Use config threshold if not provided
         if min_confidence is None:
             min_confidence = settings.GOOGLE_VISION_CONFIDENCE_THRESHOLD
-        
+
         # Detect text in all 4 rotations (parallel)
         logger.info("Starting OCR with 4-direction rotation")
-        
+
         tasks = [
             self._rotate_and_detect(image_bytes, rotation, min_confidence, as_blocks)
             for rotation in [0, 90, 180, 270]
         ]
-        
+
         # Run in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Combine results
         all_texts = []
         for i, result in enumerate(results):
@@ -88,7 +94,7 @@ class VisionService:
                 logger.error(f"Rotation {i*90}° failed: {result}")
             else:
                 all_texts.extend(result)
-        
+
         # Remove duplicates and clean
         unique_texts = list(set(all_texts))
         if as_blocks:
@@ -96,10 +102,10 @@ class VisionService:
         else:
             cleaned_texts = [clean_detected_text(text) for text in unique_texts]
             cleaned_texts = [text for text in cleaned_texts if text]  # Remove empty
-        
+
         logger.info(f"OCR complete: {len(cleaned_texts)} unique texts detected")
         return cleaned_texts
-    
+
     async def _rotate_and_detect(
         self,
         image_bytes: bytes,
@@ -107,70 +113,92 @@ class VisionService:
         min_confidence: float,
         as_blocks: bool = False
     ) -> List[str]:
-        """
-        Rotate image and detect text.
-        
-        Args:
-            image_bytes: Original image bytes
-            rotation: Rotation degrees (0, 90, 180, 270)
-            min_confidence: Minimum confidence threshold
-            
-        Returns:
-            List of detected texts
-        """
+        """Rotate image and detect text via API key REST or SDK."""
         try:
             # Rotate image
             if rotation > 0:
                 rotated_bytes = rotate_image(image_bytes, rotation)
             else:
                 rotated_bytes = image_bytes
-            
-            # Prepare image for Vision API
-            image = vision.Image(content=rotated_bytes)
-            
-            # Detect text (run in thread pool to avoid blocking)
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                self.client.text_detection,
-                image
-            )
-            
-            # Check for errors
-            if response.error.message:
-                raise google_exceptions.GoogleAPIError(
-                    f"Vision API error: {response.error.message}"
-                )
-            
-            # Extract detected text
-            detected_texts = []
-            
-            # text_annotations[0] contains the full text detection (most reliable)
-            # text_annotations[1:] contain individual words/phrases
-            if response.text_annotations:
-                # Use full text from first annotation
-                full_text = response.text_annotations[0].description
-                
-                if as_blocks:
-                    # Keep the text block intact to preserve multi-line book structures
-                    detected_texts = [full_text.strip()]
-                else:
-                    # Split by newlines to get individual text segments
-                    # This captures book titles that span multiple lines
-                    text_lines = [line.strip() for line in full_text.strip().split('\n')]
-                    detected_texts = [line for line in text_lines if line]
-                
-                logger.debug(
-                    f"Rotation {rotation}°: {len(detected_texts)} text units detected"
-                )
+
+            if self.api_key:
+                return await self._detect_rest(rotated_bytes, rotation, as_blocks)
             else:
-                logger.debug(f"Rotation {rotation}°: No text detected")
-            
-            return detected_texts
-            
+                return await self._detect_sdk(rotated_bytes, rotation, as_blocks)
         except Exception as e:
             logger.error(f"OCR failed at rotation {rotation}°: {e}")
             return []
+
+    # ── REST mode (API key) ────────────────────────────────────────────────
+
+    async def _detect_rest(
+        self, image_bytes: bytes, rotation: int, as_blocks: bool
+    ) -> List[str]:
+        """Call the Vision REST endpoint with an API key."""
+        b64 = base64.b64encode(image_bytes).decode("utf-8")
+        payload = {
+            "requests": [
+                {
+                    "image": {"content": b64},
+                    "features": [{"type": "TEXT_DETECTION"}],
+                }
+            ]
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{VISION_REST_URL}?key={self.api_key}", json=payload
+            )
+        resp.raise_for_status()
+        data = resp.json()
+
+        annotations = (
+            data.get("responses", [{}])[0].get("textAnnotations", [])
+        )
+        if not annotations:
+            logger.debug(f"Rotation {rotation}°: No text detected")
+            return []
+
+        full_text = annotations[0].get("description", "")
+        if as_blocks:
+            return [full_text.strip()] if full_text.strip() else []
+
+        lines = [ln.strip() for ln in full_text.strip().split("\n")]
+        detected = [ln for ln in lines if ln]
+        logger.debug(f"Rotation {rotation}°: {len(detected)} text units detected")
+        return detected
+
+    # ── SDK mode (service account) ─────────────────────────────────────────
+
+    async def _detect_sdk(
+        self, image_bytes: bytes, rotation: int, as_blocks: bool
+    ) -> List[str]:
+        """Call Vision API via the google-cloud-vision SDK."""
+        from google.cloud import vision as vision_sdk
+        from google.api_core import exceptions as google_exceptions
+
+        image = vision_sdk.Image(content=image_bytes)
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None, self.client.text_detection, image
+        )
+
+        if response.error.message:
+            raise google_exceptions.GoogleAPIError(
+                f"Vision API error: {response.error.message}"
+            )
+
+        if not response.text_annotations:
+            logger.debug(f"Rotation {rotation}°: No text detected")
+            return []
+
+        full_text = response.text_annotations[0].description
+        if as_blocks:
+            return [full_text.strip()] if full_text.strip() else []
+
+        lines = [ln.strip() for ln in full_text.strip().split("\n")]
+        detected = [ln for ln in lines if ln]
+        logger.debug(f"Rotation {rotation}°: {len(detected)} text units detected")
+        return detected
     
     async def match_book_names(
         self,
@@ -466,7 +494,7 @@ Return JSON in this format:
 }}
 
 Reminder: If the profile has 'has_history': false, then "recommendations": [] must be empty.
-Include only items with match_score > 0.6 and return them sorted by score. Return only JSON:"""
+Include only items with match_score > 0.4 and return them sorted by score. Return only JSON:"""
         
         try:
             response = await openai_service.generate_completion(

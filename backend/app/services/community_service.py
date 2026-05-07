@@ -711,17 +711,36 @@ class CommunityService:
     # ── notification helpers ───────────────────────────────────────────────────
 
     def _create_join_request_notification(self, community: Community, actor_id: UUID, request_id):
+        """Send a join request notification to the creator AND all admins."""
         try:
             from app.models.notification import Notification
             actor = self.db.query(User).filter(User.id == actor_id).first()
             name = actor.full_name or actor.username or "Someone"
-            self.db.add(Notification(
-                user_id=community.creator_id,
-                actor_id=actor_id,
-                type="community_join_request",
-                entity_id=request_id,
-                message=f"{name} wants to join {community.name}",
-            ))
+
+            # Gather all users who should be notified: creator + admins
+            recipient_ids = {community.creator_id}
+            admin_members = (
+                self.db.query(CommunityMember.user_id)
+                .filter(
+                    CommunityMember.community_id == community.id,
+                    CommunityMember.role.in_(["admin", "creator"]),
+                )
+                .all()
+            )
+            for (uid,) in admin_members:
+                recipient_ids.add(uid)
+
+            # Don't notify the actor themselves
+            recipient_ids.discard(actor_id)
+
+            for rid in recipient_ids:
+                self.db.add(Notification(
+                    user_id=rid,
+                    actor_id=actor_id,
+                    type="community_join_request",
+                    entity_id=request_id,
+                    message=f"{name} wants to join {community.name}",
+                ))
         except Exception:
             pass
 

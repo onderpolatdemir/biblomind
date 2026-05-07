@@ -65,7 +65,8 @@ class Settings(BaseSettings):
     OPENAI_TEMPERATURE: float = 0.7
     
     # Google Cloud Vision (Will be used in Week 5)
-    GOOGLE_APPLICATION_CREDENTIALS: str = "credentials/google-vision-key.json"
+    GOOGLE_APPLICATION_CREDENTIALS: str = ""
+    GOOGLE_VISION_API_KEY: str = ""
     GOOGLE_VISION_CONFIDENCE_THRESHOLD: float = 0.7
     
     # Payment (Will be used in Week 8)

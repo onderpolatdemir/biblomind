@@ -36,10 +36,11 @@ interface PostCardProps {
         created_at: string;
     };
     onDelete?: (id: string) => void;
+    onImageClick?: (src: string) => void;
     showCommunity?: boolean;
 }
 
-export default function PostCard({ post, onDelete, showCommunity = false }: PostCardProps) {
+export default function PostCard({ post, onDelete, onImageClick, showCommunity = false }: PostCardProps) {
     const [liked, setLiked] = useState(post.is_liked);
     const [saved, setSaved] = useState(post.is_saved);
     const [likeCount, setLikeCount] = useState(post.like_count);
@@ -175,7 +176,12 @@ export default function PostCard({ post, onDelete, showCommunity = false }: Post
 
             {imageSrc && (
                 <div className="px-5 pb-3">
-                    <img src={imageSrc} alt="post" className="w-full rounded-xl object-cover max-h-80" />
+                    <img
+                        src={imageSrc}
+                        alt="post"
+                        className={`w-full rounded-xl object-cover max-h-80 ${onImageClick ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                        onClick={() => onImageClick?.(imageSrc)}
+                    />
                 </div>
             )}
 

@@ -530,16 +530,18 @@ class SocialService:
         buddy_id: UUID
     ) -> Optional[UserConnection]:
         """
-        Create or update user connection.
-        
-        Args:
-            user_id: User ID
-            buddy_id: Buddy ID
-        
-        Returns:
-            UserConnection object or None if failed
+        Send a connection request to a buddy.
+
+        Sets status to 'pending' and creates a buddy_request notification
+        for the target user. If a connection already exists the behaviour
+        depends on its current status:
+        - pending / connected → return as-is (no duplicate)
+        - suggested → upgrade to pending + notify
+        - blocked → return as-is (cannot override block)
         """
         try:
+            from app.models.notification import Notification
+
             # Check if connection already exists
             existing = (
                 self.db.query(UserConnection)
@@ -557,51 +559,152 @@ class SocialService:
                 )
                 .first()
             )
-            
+
             if existing:
-                # Update status to connected
-                existing.status = "connected"
+                if existing.status in ("connected", "pending", "blocked"):
+                    return existing
+                # 'suggested' → upgrade to pending request
+                existing.status = "pending"
+                existing.user_id = user_id
+                existing.buddy_id = buddy_id
+                self._send_buddy_request_notification(user_id, buddy_id, existing.id)
                 self.db.commit()
                 self.db.refresh(existing)
-                logger.info(f"Updated connection: {user_id} <-> {buddy_id}")
+                logger.info(f"Upgraded suggested → pending: {user_id} → {buddy_id}")
                 return existing
-            
+
             # Get users
             user = self.db.query(User).filter(User.id == user_id).first()
             buddy = self.db.query(User).filter(User.id == buddy_id).first()
-            
+
             if not user or not buddy:
                 logger.warning(f"User or buddy not found: {user_id}, {buddy_id}")
                 return None
-            
+
             # Calculate compatibility
             similarity = self.calculate_user_similarity(user, buddy)
-            
+
             # Count shared books
             shared_interests = self.get_shared_interests(user_id, buddy_id)
-            
-            # Create connection
+
+            # Create connection with pending status
             connection = UserConnection(
                 user_id=user_id,
                 buddy_id=buddy_id,
                 compatibility_score=similarity,
                 shared_books=shared_interests["shared_books_count"],
                 shared_genres=shared_interests["shared_genres_count"],
-                status="connected"
+                status="pending"
             )
-            
+
             self.db.add(connection)
+            self.db.flush()
+
+            # Send buddy_request notification to the target user
+            self._send_buddy_request_notification(user_id, buddy_id, connection.id)
+
             self.db.commit()
             self.db.refresh(connection)
-            
+
             logger.info(
-                f"Created connection: {user_id} <-> {buddy_id} "
+                f"Created pending connection request: {user_id} → {buddy_id} "
                 f"(score: {similarity:.3f})"
             )
-            
+
             return connection
-            
+
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error creating connection: {e}")
             return None
+
+    def accept_connection(self, user_id: UUID, connection_id: UUID) -> Optional[UserConnection]:
+        """
+        Accept a pending connection request.
+        Only the buddy (recipient) can accept.
+        """
+        try:
+            from app.models.notification import Notification
+
+            conn = self.db.query(UserConnection).filter(UserConnection.id == connection_id).first()
+            if not conn:
+                return None
+            if conn.buddy_id != user_id:
+                return None  # only the recipient can accept
+            if conn.status != "pending":
+                return conn  # already processed
+
+            conn.status = "connected"
+
+            # Remove the buddy_request notification
+            self.db.query(Notification).filter(
+                Notification.entity_id == connection_id,
+                Notification.type == "buddy_request",
+            ).delete(synchronize_session=False)
+
+            # Notify the requester that their request was accepted
+            actor = self.db.query(User).filter(User.id == user_id).first()
+            name = actor.full_name or actor.username or "Someone"
+            self.db.add(Notification(
+                user_id=conn.user_id,
+                actor_id=user_id,
+                type="buddy_accepted",
+                entity_id=connection_id,
+                message=f"{name} accepted your connection request",
+            ))
+
+            self.db.commit()
+            self.db.refresh(conn)
+            logger.info(f"Connection accepted: {conn.user_id} <-> {conn.buddy_id}")
+            return conn
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error accepting connection {connection_id}: {e}")
+            return None
+
+    def reject_connection(self, user_id: UUID, connection_id: UUID) -> bool:
+        """
+        Reject a pending connection request.
+        Only the buddy (recipient) can reject. Deletes the connection row.
+        """
+        try:
+            from app.models.notification import Notification
+
+            conn = self.db.query(UserConnection).filter(UserConnection.id == connection_id).first()
+            if not conn:
+                return False
+            if conn.buddy_id != user_id:
+                return False
+            if conn.status != "pending":
+                return False
+
+            # Remove related notification
+            self.db.query(Notification).filter(
+                Notification.entity_id == connection_id,
+                Notification.type == "buddy_request",
+            ).delete(synchronize_session=False)
+
+            self.db.delete(conn)
+            self.db.commit()
+            logger.info(f"Connection rejected and deleted: {connection_id}")
+            return True
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error rejecting connection {connection_id}: {e}")
+            return False
+
+    def _send_buddy_request_notification(self, sender_id: UUID, recipient_id: UUID, connection_id):
+        """Create a buddy_request notification for the recipient."""
+        try:
+            from app.models.notification import Notification
+            actor = self.db.query(User).filter(User.id == sender_id).first()
+            name = actor.full_name or actor.username or "Someone"
+            self.db.add(Notification(
+                user_id=recipient_id,
+                actor_id=sender_id,
+                type="buddy_request",
+                entity_id=connection_id,
+                message=f"{name} wants to connect with you",
+            ))
+        except Exception:
+            pass

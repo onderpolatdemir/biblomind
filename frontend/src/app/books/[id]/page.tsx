@@ -86,7 +86,7 @@ export default function BookDetailPage() {
     const [isAdded, setIsAdded] = useState(false);
     const [activeTab, setActiveTab] = useState<"details" | "reviews">("details");
 
-    const [relatedBooks, setRelatedBooks] = useState<Book[]>([]);
+
     const [reviews, setReviews] = useState<BookReview[]>([]);
     const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
     const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
@@ -182,16 +182,19 @@ export default function BookDetailPage() {
                 if (!res.ok) throw new Error("Book not found");
                 const data = await res.json();
                 setBook(data);
-                // Fetch related books (mocking by just fetching latest 4 books for now)
-                // In a real app, we'd filter by genre or author
-                const relatedRes = await fetch(`http://localhost:8000/api/books?page_size=4`);
-                if (relatedRes.ok) {
-                    const relatedData = await relatedRes.json();
-                    setRelatedBooks(relatedData.items.filter((b: Book) => b.id !== id));
-                }
 
                 // Fetch reviews
                 fetchReviews();
+
+                // Fetch review eligibility (has the user purchased this book?)
+                if (user) {
+                    try {
+                        const eligRes = await api.get(`/reviews/book/${id}/eligibility`);
+                        setEligibility(eligRes.data);
+                    } catch {
+                        setEligibility(null);
+                    }
+                }
             } catch (error) {
                 console.error("Error fetching book:", error);
             } finally {
@@ -497,273 +500,7 @@ export default function BookDetailPage() {
                     </div>
                 </div>
 
-                {/* Details & Specs Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-20">
-                    {/* Specs Table */}
-                    <div className="lg:col-span-5">
-                        <h3 className="text-2xl font-heading font-bold text-text mb-6">Details</h3>
-                        <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
-                            <div className="space-y-4">
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Book Title</span>
-                                    <span className="text-text font-bold text-right">{book.title}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Author</span>
-                                    <span className="text-text font-bold text-right">{book.author}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Categories</span>
-                                    <span className="text-text font-bold text-right">{book.genres?.slice(0, 3).join(", ") || "N/A"}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">ISBN</span>
-                                    <span className="text-text font-bold text-right">{book.isbn || "N/A"}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Edition Language</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.language}</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Book Format</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.format}, {mockDetails.pages} Pages</span>
-                                </div>
-                                <div className="flex justify-between py-3 border-b border-gray-200">
-                                    <span className="text-gray-500 font-medium">Date Published</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.publishedDate}</span>
-                                </div>
-                                <div className="flex justify-between py-3">
-                                    <span className="text-gray-500 font-medium">Publisher</span>
-                                    <span className="text-text font-bold text-right">{mockDetails.publisher}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Reviews Visualization (Right side logic) */}
-                    <div className="lg:col-span-1"></div> {/* Spacer */}
-                    <div className="lg:col-span-6">
-                        <h3 className="text-2xl font-heading font-bold text-text mb-6">Customer Reviews</h3>
-                        <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 flex flex-col md:flex-row gap-8 items-center mb-8">
-                            {/* Big Score */}
-                            <div className="text-center md:text-left min-w-[120px]">
-                                <div className="text-6xl font-bold text-text mb-2">{(reviews.reduce((acc, r) => acc + r.rating, 0) / (reviews.length || 1)).toFixed(1)}</div>
-                                <div className="flex justify-center md:justify-start gap-1 mb-2">
-                                    {[1, 2, 3, 4, 5].map(s => (
-                                        <Star key={s} className={`w-4 h-4 ${s <= Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / (reviews.length || 1)) ? 'fill-orange-400 text-orange-400' : 'text-gray-300'}`} />
-                                    ))}
-                                </div>
-                                <p className="text-sm text-gray-500">{reviews.length} reviews</p>
-                            </div>
-
-                            {/* Bars */}
-                            <div className="flex-1 w-full space-y-3">
-                                {[
-                                    { stars: 5 },
-                                    { stars: 4 },
-                                    { stars: 3 },
-                                    { stars: 2 },
-                                    { stars: 1 },
-                                ].map((row) => {
-                                    const count = reviews.filter(r => r.rating === row.stars).length;
-                                    const pct = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
-                                    return (
-                                        <div key={row.stars} className="flex items-center gap-3 text-sm">
-                                            <span className="font-bold w-3">{row.stars}</span>
-                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-orange-400 rounded-full" style={{ width: `${pct}%` }}></div>
-                                            </div>
-                                            <span className="w-8 text-right font-medium text-gray-500">{pct}%</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Review Action Area */}
-                        <div className="mb-8">
-                            {user ? (
-                                eligibility ? (
-                                    eligibility.can_review || eligibility.has_reviewed ? (
-                                        <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                                            {!isReviewFormOpen ? (
-                                                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                                                    <div>
-                                                        <h4 className="font-bold text-lg text-gray-800">
-                                                            {eligibility.has_reviewed ? "Update your review" : "Share your thoughts"}
-                                                        </h4>
-                                                        <p className="text-gray-500 text-sm">
-                                                            {eligibility.has_reviewed ? "You have already reviewed this book." : "Help others by sharing your experience."}
-                                                        </p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setIsReviewFormOpen(true)}
-                                                        className="px-6 py-2.5 bg-text text-white font-bold rounded-lg hover:bg-opacity-90 transition-all shadow-sm w-full md:w-auto flex items-center justify-center gap-2"
-                                                    >
-                                                        {eligibility.has_reviewed ? <Edit2 size={18} /> : <MessageSquare size={18} />}
-                                                        {eligibility.has_reviewed ? "Update Review" : "Add Review"}
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="font-bold text-lg text-gray-800">
-                                                            {eligibility.has_reviewed ? "Edit Review" : "Write a Review"}
-                                                        </h4>
-                                                        <button
-                                                            onClick={() => setIsReviewFormOpen(false)}
-                                                            className="text-gray-400 hover:text-gray-600 font-medium text-sm"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-
-                                                    {reviewError && (
-                                                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-start gap-2 border border-red-100">
-                                                            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                                                            <p>{reviewError}</p>
-                                                        </div>
-                                                    )}
-
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
-                                                        <div className="flex gap-1">
-                                                            {[1, 2, 3, 4, 5].map(star => (
-                                                                <button
-                                                                    key={star}
-                                                                    type="button"
-                                                                    onClick={() => setReviewForm({ ...reviewForm, rating: star })}
-                                                                    className="p-1 transition-transform hover:scale-110 focus:outline-none"
-                                                                >
-                                                                    <Star
-                                                                        size={28}
-                                                                        fill={star <= reviewForm.rating ? "currentColor" : "none"}
-                                                                        className={star <= reviewForm.rating ? "text-orange-400" : "text-gray-300"}
-                                                                    />
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Your Review (Optional)</label>
-                                                        <textarea
-                                                            value={reviewForm.comment}
-                                                            onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                                                            className="w-full bg-white border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow outline-none resize-none"
-                                                            rows={4}
-                                                            placeholder="What did you like or dislike? What should others know?"
-                                                        ></textarea>
-                                                    </div>
-
-                                                    <div className="flex justify-end pt-2">
-                                                        <button
-                                                            onClick={handleReviewSubmit}
-                                                            disabled={isSubmittingReview}
-                                                            className="px-8 py-3 bg-primary text-white font-bold rounded-xl hover:bg-opacity-90 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[150px]"
-                                                        >
-                                                            {isSubmittingReview ? (
-                                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                                            ) : (
-                                                                eligibility.has_reviewed ? "Save Changes" : "Submit Review"
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="bg-orange-50 rounded-xl p-5 border border-orange-100 flex items-start gap-3">
-                                            <AlertCircle className="text-orange-500 mt-0.5 flex-shrink-0" size={20} />
-                                            <div>
-                                                <h4 className="font-bold text-orange-800 mb-1">Review locked</h4>
-                                                <p className="text-orange-700 text-sm">You have to buy this book if you want to review this book.</p>
-                                            </div>
-                                        </div>
-                                    )
-                                ) : (
-                                    <div className="flex justify-center py-4 text-gray-400">Loading eligibility...</div>
-                                )
-                            ) : (
-                                <div className="bg-gray-50 rounded-xl p-6 text-center border border-gray-100">
-                                    <p className="text-gray-600 mb-4 font-medium">Please sign in to write a review for this book.</p>
-                                    <Link href="/auth/login" className="inline-block px-6 py-2 bg-text text-white font-bold rounded-lg hover:bg-opacity-90 transition-all">
-                                        Sign In
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Reviews List */}
-                        <div className="space-y-6">
-                            {reviews.length === 0 ? (
-                                <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                    <MessageSquare className="mx-auto text-gray-300 w-12 h-12 mb-3" />
-                                    <p className="text-gray-500 font-medium">No reviews yet.</p>
-                                    <p className="text-gray-400 text-sm">Be the first to share your thoughts!</p>
-                                </div>
-                            ) : (
-                                reviews.map((review) => {
-                                    const isEdited = new Date(review.updated_at).getTime() > new Date(review.created_at).getTime() + 1000;
-                                    return (
-                                        <div key={review.id} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                        {review.user_name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-gray-800">{formatUsername(review.user_name)}</p>
-                                                        <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                                            <span>{new Date(review.created_at).toLocaleDateString()}</span>
-                                                            {isEdited && (
-                                                                <span className="italic text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full text-[10px]">(Edited)</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-0.5">
-                                                    {[1, 2, 3, 4, 5].map(star => (
-                                                        <Star
-                                                            key={star}
-                                                            size={14}
-                                                            fill={star <= review.rating ? "currentColor" : "none"}
-                                                            className={star <= review.rating ? "text-orange-400" : "text-gray-300"}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            {review.comment && (
-                                                <p className="text-gray-700 leading-relaxed mt-4">
-                                                    {review.comment}
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Related Books */}
-                <div className="mb-8">
-                    <h3 className="text-2xl font-heading font-bold text-text mb-8">Related books</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {relatedBooks.map((related) => (
-                            <div key={related.id} className="block h-full">
-                                <BookCard
-                                    id={related.id}
-                                    title={related.title}
-                                    author={related.author}
-                                    price={Number(related.price)}
-                                    rating={related.rating || 4.5}
-                                    imageSrc={related.cover_url || "/book-placeholder.jpg"}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
                 {/* Tabs: Details / Reviews */}
                 <div className="mb-10">
@@ -852,6 +589,14 @@ export default function BookDetailPage() {
                                     <p className="text-gray-500 text-sm">
                                         <Link href="/auth/login" className="text-primary font-bold hover:underline">Log in</Link> to leave a review.
                                     </p>
+                                ) : eligibility && !eligibility.can_review && !eligibility.has_reviewed ? (
+                                    <div className="bg-orange-50 rounded-xl p-5 border border-orange-100 flex items-start gap-3">
+                                        <AlertCircle className="text-orange-500 mt-0.5 flex-shrink-0" size={20} />
+                                        <div>
+                                            <h4 className="font-bold text-orange-800 mb-1">Review locked</h4>
+                                            <p className="text-orange-700 text-sm">You must purchase this book before you can leave a review.</p>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div className="space-y-4">
                                         {/* Star Picker */}
