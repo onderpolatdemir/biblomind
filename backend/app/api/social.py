@@ -23,6 +23,7 @@ from app.schemas.social import (
     BlockResponse,
     UserSearchResult,
     UserSearchResponse,
+    BuddyCommunityRecommendationsResponse,
 )
 from app.core.logging import logger
 
@@ -68,7 +69,7 @@ async def search_users(
 @router.get("/find-buddies", response_model=BookBuddyListResponse)
 async def find_book_buddies(
     limit: int = Query(10, ge=1, le=50, description="Maximum number of buddies to return"),
-    min_similarity: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"),
+    min_similarity: float = Query(0.6, ge=0.0, le=1.0, description="Minimum similarity threshold"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -399,3 +400,27 @@ async def reject_connection(
     logger.info(f"User {current_user.id} rejected connection {connection_id}")
     return {"ok": True, "message": "Connection request rejected"}
 
+
+@router.get("/community-recommendations", response_model=BuddyCommunityRecommendationsResponse)
+async def get_community_recommendations(
+    limit: int = Query(5, ge=1, le=20, description="Maximum recommendations"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get community recommendations based on current user's connections (buddies).
+    Suggests communities that buddies belong to, excluding communities the user
+    is already a member of.
+    """
+    service = SocialService(db)
+    recommendations = service.get_buddy_community_recommendations(
+        user_id=current_user.id,
+        limit=limit
+    )
+
+    logger.info(f"User {current_user.id} fetched {len(recommendations)} community recommendations from buddies")
+
+    return BuddyCommunityRecommendationsResponse(
+        recommendations=recommendations,
+        total=len(recommendations)
+    )
