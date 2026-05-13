@@ -5,8 +5,8 @@ import os
 # Add current directory to path so we can import app if needed, 
 # but for now we'll just hardcode keys from the logs to avoid import issues
 # Keys from user logs:
-API_KEY = 'sandbox-Gc0atERnvDsxpWHOWSStguLcQfY0w3ue'
-SECRET_KEY = 'sandbox-iW7Wfqs0XIoHu4P7swZd6qeoOmvqMKt0'
+API_KEY = os.environ.get('IYZICO_API_KEY', 'your-api-key')
+SECRET_KEY = os.environ.get('IYZICO_SECRET_KEY', 'your-secret-key')
 
 # Test cases for base_url
 urls_to_test = [

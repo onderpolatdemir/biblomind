@@ -386,7 +386,8 @@ class RecommendationService:
         self,
         user: User,
         limit: int,
-        excluded_book_ids: List[UUID]
+        excluded_book_ids: List[UUID],
+        user_prefs: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """
         Get content-based recommendations using user preference vector.
@@ -395,6 +396,7 @@ class RecommendationService:
             user: User object
             limit: Number of recommendations
             excluded_book_ids: Books to exclude
+            user_prefs: User preferences (optional)
             
         Returns:
             List of recommendation dicts
@@ -415,14 +417,33 @@ class RecommendationService:
             query = query.filter(Book.id.notin_(excluded_book_ids))
         
         # Increase candidate pool to find more diverse matches (author/genre)
-        results = query.order_by('distance').limit(limit * 10).all()
+        results_vector = query.order_by('distance').limit(limit * 10).all()
         
-        # Get user preferences
-        user_prefs = {}
-        try:
-            user_prefs = await UserService.get_user_reading_profile(self.db, user.id, self.openai_service)
-        except Exception as e:
-            logger.warning(f"Could not load user_prefs for user {user.id}: {e}")
+        results_authors = []
+        if user_prefs:
+            fav_authors = user_prefs.get('favorite_authors', [])
+            if fav_authors:
+                author_query = self.db.query(
+                    Book,
+                    Book.embedding.cosine_distance(user.preferences_vector).label('distance')
+                ).filter(
+                    and_(
+                        Book.embedding.isnot(None),
+                        Book.stock > 0,
+                        Book.author.in_(fav_authors)
+                    )
+                )
+                if excluded_book_ids:
+                    author_query = author_query.filter(Book.id.notin_(excluded_book_ids))
+                results_authors = author_query.limit(limit * 5).all()
+
+        # Combine and deduplicate
+        seen_ids = set()
+        results = []
+        for book, distance in results_vector + results_authors:
+            if book.id not in seen_ids:
+                seen_ids.add(book.id)
+                results.append((book, distance))
 
         # Get genre weights from sync prefs (Counter-based, not LLM-based)
         sync_prefs = UserService.get_user_preferences(self.db, user.id)
@@ -510,7 +531,33 @@ class RecommendationService:
             candidates_query = candidates_query.filter(Book.id.notin_(excluded_book_ids))
         
         # Pulling more candidates ensures we can find authors even if baseline similarity is lower
-        candidates = candidates_query.limit(limit * 10).all()
+        results_vector = candidates_query.order_by('distance').limit(limit * 10).all()
+        
+        results_authors = []
+        if user_prefs:
+            fav_authors = user_prefs.get('favorite_authors', [])
+            if fav_authors:
+                author_query = self.db.query(
+                    Book,
+                    Book.embedding.cosine_distance(user.preferences_vector).label('distance')
+                ).filter(
+                    and_(
+                        Book.embedding.isnot(None),
+                        Book.stock > 0,
+                        Book.author.in_(fav_authors)
+                    )
+                )
+                if excluded_book_ids:
+                    author_query = author_query.filter(Book.id.notin_(excluded_book_ids))
+                results_authors = author_query.limit(limit * 5).all()
+
+        # Combine and deduplicate
+        seen_ids = set()
+        candidates = []
+        for book, distance in results_vector + results_authors:
+            if book.id not in seen_ids:
+                seen_ids.add(book.id)
+                candidates.append((book, distance))
         
         # Calculate hybrid scores
         recommendations = []
