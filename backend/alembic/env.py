@@ -13,16 +13,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 # Import settings and models
 from app.core.config import settings
 from app.core.database import Base
-from app.models import (
-    User,
-    Book,
-    UserInteraction,
-    PhotoScan,
-    Cart,
-    CartItem,
-    Order,
-    OrderItem,
-)
+import app.models  # noqa: F401 — registers all models with Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

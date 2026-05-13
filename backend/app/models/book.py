@@ -44,6 +44,17 @@ class Book(Base):
     interactions = relationship("UserInteraction", back_populates="book")
     cart_items = relationship("CartItem", back_populates="book")
     order_items = relationship("OrderItem", back_populates="book")
+    reviews = relationship("Review", back_populates="book", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Book(id={self.id}, title={self.title}, author={self.author})>"
+
+    @property
+    def rating(self):
+        if not self.reviews:
+            return None
+        return sum(r.rating for r in self.reviews) / len(self.reviews)
+        
+    @property
+    def reviews_count(self):
+        return len(self.reviews) if self.reviews else 0

@@ -12,13 +12,15 @@ class UserCreate(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=100, description="User password (min 8 characters)")
     full_name: Optional[str] = Field(None, max_length=255, description="User's full name")
-    
+    username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$", description="Unique username (letters, numbers, underscores only)")
+
     model_config = {
         "json_schema_extra": {
             "example": {
                 "email": "user@example.com",
                 "password": "SecurePass123!",
-                "full_name": "John Doe"
+                "full_name": "John Doe",
+                "username": "johndoe"
             }
         }
     }
@@ -58,8 +60,14 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     full_name: Optional[str] = None
+    username: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    reading_goal: Optional[int] = None
+    is_admin: bool = False
+    is_active: bool = True
     created_at: datetime
-    
+
     model_config = {
         "from_attributes": True,
         "json_schema_extra": {

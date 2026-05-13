@@ -9,22 +9,32 @@ pgvector>=0.3.6
 alembic>=1.14.0
 
 # Caching & Search
-redis>=5.2.1
-elasticsearch>=8.16.0
+redis[hiredis]>=5.2.1  # Faster Redis client with C parser
+elasticsearch==8.11.1  # Compatible with ES 8.11.0 container
 
 # AI/ML (Will be used in Week 5)
 openai>=1.58.1
 google-cloud-vision>=3.8.1
 langchain>=0.3.13
 langchain-openai>=0.2.14
+langchain-core>=0.3.21
+
+# Image Processing
+Pillow>=10.0.0
+
+# Fuzzy String Matching
+python-Levenshtein>=0.21.0
+fuzzywuzzy>=0.18.0
 
 # Data Validation
 pydantic>=2.10.4
 pydantic-settings>=2.7.0
+email-validator>=2.0.0  # Required by pydantic for email validation
 
 # Authentication
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt==3.2.0  # passlib compatible version
 python-multipart>=0.0.20
 
 # Background Tasks (Will be used in Week 9)
@@ -32,4 +42,22 @@ celery[redis]>=5.4.0
 
 # Utilities
 python-dotenv>=1.0.1
+tenacity>=8.0.0  # Retry logic for API calls
 
+# Rate Limiting & Monitoring
+slowapi>=0.1.9  # Rate limiting
+sentry-sdk[fastapi]>=1.40.0  # Error tracking and performance monitoring
+
+# Dataset & Load Testing
+kaggle>=1.6.6  # Optional: Kaggle dataset download
+locust>=2.20.0  # Load testing
+
+# Testing (Development)
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0
+httpx>=0.27.0  # For testing async HTTP requests
+
+
+# Payment
+iyzipay>=0.4.0

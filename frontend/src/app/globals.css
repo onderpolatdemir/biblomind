@@ -2,13 +2,133 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
+@layer base {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+
+  :root {
+    /* BiblioMind Theme */
+    --background: 60 9% 96%;
+    /* #f7f7f5 */
+    --foreground: 0 0% 18%;
+    /* #2f2f2f */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 18%;
+
+    --primary: 128 25% 76%;
+    /* #b4d2b8 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 60 5% 91%;
+    /* #e8e8e6 */
+    --secondary-foreground: 0 0% 18%;
+
+    --muted: 60 4.8% 95.9%;
+    --muted-foreground: 25 5.3% 44.7%;
+
+    --accent: 25 48% 49%;
+    /* #b87241 */
+    --accent-foreground: 0 0% 18%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 20 5.9% 90%;
+    --input: 20 5.9% 90%;
+    --ring: 153 27% 29%;
+
+    --radius: 0.5rem;
+
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 20 14.3% 4.1%;
+    --foreground: 60 9.1% 97.8%;
+
+    --card: 20 14.3% 4.1%;
+    --card-foreground: 60 9.1% 97.8%;
+
+    --popover: 20 14.3% 4.1%;
+    --popover-foreground: 60 9.1% 97.8%;
+
+    --primary: 147 34% 43%;
+    --primary-foreground: 60 9.1% 97.8%;
+
+    --secondary: 12 6.5% 15.1%;
+    --secondary-foreground: 60 9.1% 97.8%;
+
+    --muted: 12 6.5% 15.1%;
+    --muted-foreground: 24 5.4% 63.9%;
+
+    --accent: 12 6.5% 15.1%;
+    --accent-foreground: 60 9.1% 97.8%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 9.1% 97.8%;
+
+    --border: 12 6.5% 15.1%;
+    --input: 12 6.5% 15.1%;
+    --ring: 147 34% 43%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
+@layer utilities {
+  /* Vivid hover colors for primary/accent action buttons.
+     Applies only to <button>/<a> elements with an exact .bg-primary or .bg-accent class,
+     so translucent variants (bg-primary/10) and non-interactive elements are unaffected.
+     The :not() guards prevent override when a button is in a success/disabled state. */
+  button[class~="bg-primary"]:not([class*="bg-green"]):not(:disabled):hover,
+  a[class~="bg-primary"]:not([class*="bg-green"]):hover {
+    background-color: #7cbd86;
+    /* vivid green — ~15% darker/saturated than #b4d2b8 */
+    box-shadow: 0 10px 25px -8px rgba(124, 189, 134, 0.55);
+  }
+
+  button[class~="bg-accent"]:not(:disabled):hover,
+  a[class~="bg-accent"]:hover {
+    background-color: #d9833f;
+    /* vivid warm copper — brighter than #b87241 */
+    box-shadow: 0 10px 25px -8px rgba(217, 131, 63, 0.5);
+  }
+
+  /* Smooth the color transition even if the element didn't declare one */
+  button[class~="bg-primary"],
+  a[class~="bg-primary"],
+  button[class~="bg-accent"],
+  a[class~="bg-accent"] {
+    transition-property: background-color, box-shadow, transform, border-color, color;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
