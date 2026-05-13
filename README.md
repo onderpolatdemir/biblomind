@@ -67,23 +67,21 @@ A complete end-to-end shopping experience integrated with the **Iyzico** payment
 
 ## 🖼️ Project Showcase
 
-*(Insert your screenshots/GIFs below to make this repository stand out to recruiters and developers!)*
-
 ### 1. The Biblomind Homepage & Dashboard
 
-> **📸 Add a screenshot here:** `![Homepage Dashboard](./static/uploads/screenshots/login.mp4)`
-> *Suggestion: Show the sleek user interface, ideally highlighting the rich design, vibrant colors, and personalized welcome section.*
+https://github.com/user-attachments/assets/d372c4f5-889c-4813-9a6f-1351750eb29d
 
 ### 2. AI Photo-Based Bookshelf Scanner
 
-> **🎞️ Add a GIF here:** `![Bookshelf Scanner](./static/uploads/screenshots/photo.mp4`)
-> *Suggestion: A 5-10 second GIF of a user uploading a photo of a bookshelf, the UI showing a "Scanning..." animation, and then revealing the recommended books.*
+https://github.com/user-attachments/assets/bbb99684-3f73-4024-84f5-88b284baff6c
 
-### 4. Biblomind Social Feed
+### 4. Reccommendation Page
 
-> **📸 Add a screenshot here:** `![Social Feed](./static/uploads/screenshots/social.mp4`
-> *Suggestion: Show the community feed, including posts, likes, comments, and the user profile sidebar.*
->
+https://github.com/user-attachments/assets/a196a113-8f3e-4fcd-8900-87901dc7a2a5
+
+### 5. Biblomind Social Feed
+https://github.com/user-attachments/assets/1604f878-3602-49ac-83f4-3fcbf1921271
+
 
 ## 🚀 Getting Started
 
